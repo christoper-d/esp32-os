@@ -808,14 +808,16 @@ const sysApp = {
       }
     };
 
-    const KB_KEYS = [
-      '✔', '⌫',
-      'a','b','c','d','e','f','g','h','i','j','k','l','m','n','ñ','o','p','q','r','s','t','u','v','w','x','y','z',
-      '0','1','2','3','4','5','6','7','8','9',
-      'A','B','C','D','E','F','G','H','I','J','K','L','M','N','Ñ','O','P','Q','R','S','T','U','V','W','X','Y','Z',
-      '.','_','-','@','#','$','%','&','*','!','?','␣',
-      '👁', '◀'
+    // Teclado WiFi de 2 Filas (idéntico al .ino del ESP32):
+    // Fila 1: Listado de letras/números según el modo activo (0=abc, 1=ABC, 2=123#)
+    // Fila 2: 4 botones inferiores: [MAYUS/123#] | [BORRAR] | [ENTER] | [SALIR]
+    const KB_CHARSETS = [
+      "abcdefghijklmnopqrstuvwxyzñ ",
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZÑ ",
+      "0123456789._-@#$%&*!?+-=/ "
     ];
+    const KB_MODE_NAMES = ["abc", "ABC", "123#"];
+    const KB_ACTION_COUNT = 4;
 
     const storedSSID = localStorage.getItem("g4briel_wifi_ssid") || "Mi_Casa_5G";
     const storedPass = localStorage.getItem("g4briel_wifi_pass") || "g4briel2026";
@@ -847,6 +849,7 @@ const sysApp = {
       wifiShowPass: true,
       wifiScanIndex: 0,
       keyboardIndex: 0,
+      kbMode: 0,
       wifiScanList: [],
       githubRepoUrl: "https://raw.githubusercontent.com/christoper-d/esp32-os/main",
       bootLogoText: "G4BRIEL OS",
@@ -1645,28 +1648,30 @@ function render(tft) {
       const theme = THEMES[state.themeKey];
       ctx.fillStyle = TFT_COLORS.BLACK;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      renderStatusBar("ESCRIBIR CLAVE WIFI (280x240)");
+      renderStatusBar("TECLADO WIFI (2 FILAS)");
 
-      // Caja de contraseña con recorte (clip) y ajuste inteligente para claves largas
-      drawRoundRect(10, 27, 260, 50, 6, true, true, theme.cardBg, theme.cardBorder);
+      const chars = KB_CHARSETS[state.kbMode];
+      const len = chars.length;
+
+      // Caja superior de contraseña con ajuste automático a 2 líneas
+      drawRoundRect(10, 27, 260, 48, 6, true, true, theme.cardBg, theme.cardBorder);
       ctx.save();
       ctx.beginPath();
-      ctx.rect(12, 28, 256, 48);
+      ctx.rect(12, 28, 256, 46);
       ctx.clip();
 
-      const shortSsid = state.wifiSelectedSSID.length > 20
-        ? state.wifiSelectedSSID.slice(0, 19) + "…"
+      const shortSsid = state.wifiSelectedSSID.length > 18
+        ? state.wifiSelectedSSID.slice(0, 17) + "…"
         : state.wifiSelectedSSID;
       drawTFTText(`Red: ${shortSsid}`, 16, 30, 1, theme.accent);
-      drawTFTText(`${state.wifiPassword.length} car.`, 216, 30, 1, theme.textSecondary);
+      drawTFTText(`[${KB_MODE_NAMES[state.kbMode]}]`, 222, 30, 1, theme.textSecondary);
 
       const maskedPass = state.wifiShowPass ? state.wifiPassword : '•'.repeat(state.wifiPassword.length);
       const cursorChar = cursorBlink ? "_" : " ";
 
       if (maskedPass.length <= 15) {
-        drawTFTText(`Clave: ${maskedPass}${cursorChar}`, 16, 45, 2, TFT_COLORS.WHITE);
+        drawTFTText(`Clave: ${maskedPass}${cursorChar}`, 16, 44, 2, TFT_COLORS.WHITE);
       } else {
-        // Si la clave es larga (>15 caracteres), la dividimos en 2 líneas dentro del recuadro
         let visiblePass = maskedPass;
         let prefix = "";
         if (visiblePass.length > 60) {
@@ -1676,59 +1681,85 @@ function render(tft) {
         const fullStr = `${prefix}${visiblePass}${cursorChar}`;
         const line1 = fullStr.slice(0, 32);
         const line2 = fullStr.slice(32, 64);
-        drawTFTText(line1, 16, 44, 1, TFT_COLORS.WHITE);
+        drawTFTText(line1, 16, 43, 1, TFT_COLORS.WHITE);
         if (line2) {
-          drawTFTText(line2, 16, 58, 1, TFT_COLORS.GREEN);
+          drawTFTText(line2, 16, 56, 1, TFT_COLORS.GREEN);
         }
       }
       ctx.restore();
 
-      const drumY = 82;
-      drawRoundRect(10, drumY, 260, 72, 8, true, true, "#0b0e14", theme.cardBorder);
-      drawTFTText("▲ ANTERIOR (✔ / ⌫)", 82, drumY + 4, 1, theme.textSecondary);
+      // =====================================================================
+      // FILA 1: LISTADO HORIZONTAL DE LETRAS / NUMEROS (según modo activo)
+      // =====================================================================
+      const row1Y = 80;
+      const inRow1 = (state.keyboardIndex < len);
+      drawRoundRect(10, row1Y, 260, 62, 8, true, true, "#0b0e14", inRow1 ? theme.accent : theme.cardBorder);
 
-      const totalKeys = KB_KEYS.length;
-      for (let offset = -2; offset <= 2; offset++) {
-        const idx = (state.keyboardIndex + offset + totalKeys) % totalKeys;
-        const keyVal = KB_KEYS[idx];
-        const kx = 140 + (offset * 44) - 16;
-        const ky = drumY + 20;
-        if (offset === 0) {
-          const isOkKey = (keyVal === '✔');
-          const boxBg = isOkKey ? "#003818" : theme.accentBg;
-          const boxBorder = isOkKey ? TFT_COLORS.GREEN : theme.accentBorder;
-          drawRoundRect(kx - 6, ky - 2, 44, 34, 6, true, true, boxBg, boxBorder);
-          if (keyVal === '␣') {
-            drawTFTText("ESP", kx + 2, ky + 9, 2, TFT_COLORS.WHITE);
-          } else if (keyVal === '✔') {
-            drawTFTText("OK!", kx + 2, ky + 9, 2, TFT_COLORS.GREEN);
-          } else if (keyVal === '⌫') {
-            drawTFTText("BOR", kx + 1, ky + 9, 2, TFT_COLORS.WHITE);
+      const row1Titles = [
+        "FILA 1: MINUSCULAS (a - z)",
+        "FILA 1: MAYUSCULAS (A - Z)",
+        "FILA 1: NUMEROS Y SIMBOLOS (0 - 9)"
+      ];
+      drawTFTText(row1Titles[state.kbMode], 18, row1Y + 5, 1, inRow1 ? theme.accent : theme.textSecondary);
+
+      const centerCharIdx = inRow1 ? state.keyboardIndex : 0;
+      for (let offset = -3; offset <= 3; offset++) {
+        const idx = (centerCharIdx + offset + len) % len;
+        const c = chars[idx];
+        const kx = 140 + (offset * 35) - 14;
+        const ky = row1Y + 20;
+
+        if (offset === 0 && inRow1) {
+          drawRoundRect(kx - 4, ky - 2, 36, 34, 6, true, true, theme.accentBg, theme.accentBorder);
+          if (c === ' ') {
+            drawTFTText("ESP", kx - 1, ky + 10, 1, TFT_COLORS.WHITE);
           } else {
-            drawTFTText(keyVal, kx + 8, ky + 7, 3, TFT_COLORS.WHITE);
+            drawTFTText(c, kx + 7, ky + 6, 3, TFT_COLORS.WHITE);
           }
         } else {
-          ctx.globalAlpha = Math.abs(offset) === 1 ? 0.6 : 0.25;
-          drawRoundRect(kx, ky, 32, 28, 4, true, true, theme.cardBg, theme.cardBorder);
-          drawTFTText(keyVal === '✔' ? "OK" : keyVal, kx + (keyVal === '✔' ? 4 : 8), ky + 6, 2, keyVal === '✔' ? TFT_COLORS.GREEN : theme.textSecondary);
+          ctx.globalAlpha = Math.abs(offset) <= 1 ? 0.75 : 0.35;
+          drawRoundRect(kx, ky + 2, 28, 26, 4, true, true, theme.cardBg, theme.cardBorder);
+          if (c === ' ') {
+            drawTFTText("_", kx + 9, ky + 8, 2, theme.textSecondary);
+          } else {
+            drawTFTText(c, kx + 9, ky + 8, 2, theme.textSecondary);
+          }
           ctx.globalAlpha = 1.0;
         }
       }
-      drawTFTText("▼ SIGUIENTE LETRA", 84, drumY + 56, 1, theme.textSecondary);
 
-      const actY = 160;
-      const curKeyName = KB_KEYS[state.keyboardIndex];
-      drawRoundRect(10, actY, 80, 32, 6, true, true, curKeyName==='⌫' ? theme.accentBg : theme.cardBg, curKeyName==='⌫' ? theme.accent : theme.cardBorder);
-      drawTFTText("⌫ Borrar", 18, actY + 10, 1, TFT_COLORS.WHITE);
+      // =====================================================================
+      // FILA 2: BARRA INFERIOR DE ACCIONES (MAYUS/123# | BORRAR | ENTER | SALIR)
+      // =====================================================================
+      const row2Y = 150;
+      const nextModeLabel = (state.kbMode === 0) ? "⇧ MAYUS" : ((state.kbMode === 1) ? "123#" : "abc");
+      const btnLabels = [nextModeLabel, "⌫ BORRAR", "✔ ENTER", "◀ SALIR"];
+      const btnX = [10, 76, 142, 208];
+      const btnW = [62, 62, 62, 62];
 
-      drawRoundRect(96, actY, 88, 32, 6, true, true, curKeyName==='✔' ? "#003818" : theme.cardBg, curKeyName==='✔' ? TFT_COLORS.GREEN : theme.cardBorder);
-      drawTFTText("✔ Conectar", 104, actY + 10, 1, TFT_COLORS.GREEN);
+      for (let b = 0; b < 4; b++) {
+        const isSel = (state.keyboardIndex === len + b);
+        let bg = theme.cardBg;
+        let border = theme.cardBorder;
+        let txtCol = TFT_COLORS.WHITE;
 
-      drawRoundRect(190, actY, 80, 32, 6, true, true, curKeyName==='◀' ? theme.accentBg : theme.cardBg, curKeyName==='◀' ? theme.accent : theme.cardBorder);
-      drawTFTText("◀ Volver", 200, actY + 10, 1, TFT_COLORS.WHITE);
+        if (b === 2) {
+          // Botón ENTER destacado en verde
+          bg = isSel ? "#003818" : theme.cardBg;
+          border = isSel ? TFT_COLORS.GREEN : "#1f5c34";
+          txtCol = TFT_COLORS.GREEN;
+        } else if (isSel) {
+          bg = theme.accentBg;
+          border = theme.accentBorder;
+          txtCol = TFT_COLORS.WHITE;
+        }
 
-      drawTFTText("Elige [OK!] y pulsa ● OK (o mantén ● OK 0.6s)", 14, 200, 1, TFT_COLORS.GREEN);
-      drawTFTText("También puedes tocar [✔ Conectar] o Enter", 18, 216, 1, theme.textSecondary);
+        drawRoundRect(btnX[b], row2Y, btnW[b], 36, 6, true, true, bg, border);
+        drawTFTText(btnLabels[b], btnX[b] + 6, row2Y + 12, 1, txtCol);
+      }
+
+      drawTFTText("▲/▼: Recorrer Fila 1 y bajar a Fila 2", 22, 196, 1, theme.textSecondary);
+      drawTFTText("Mantén ● OK (0.45s): Saltar a Fila 2", 24, 212, 1, TFT_COLORS.GREEN);
     }
 
     let connectingPulse = 0;
@@ -2044,7 +2075,8 @@ function render(tft) {
         return;
       }
       if (state.currentScreen === 'WIFI_KEYBOARD') {
-        state.keyboardIndex = (state.keyboardIndex - 1 + KB_KEYS.length) % KB_KEYS.length;
+        const totalNav = KB_CHARSETS[state.kbMode].length + KB_ACTION_COUNT;
+        state.keyboardIndex = (state.keyboardIndex - 1 + totalNav) % totalNav;
         renderScreen();
         return;
       }
@@ -2084,7 +2116,8 @@ function render(tft) {
         return;
       }
       if (state.currentScreen === 'WIFI_KEYBOARD') {
-        state.keyboardIndex = (state.keyboardIndex + 1) % KB_KEYS.length;
+        const totalNav = KB_CHARSETS[state.kbMode].length + KB_ACTION_COUNT;
+        state.keyboardIndex = (state.keyboardIndex + 1) % totalNav;
         renderScreen();
         return;
       }
@@ -2157,19 +2190,26 @@ function render(tft) {
       }
 
       if (state.currentScreen === 'WIFI_KEYBOARD') {
-        const curKey = KB_KEYS[state.keyboardIndex];
-        if (curKey === '⌫') {
+        const chars = KB_CHARSETS[state.kbMode];
+        const len = chars.length;
+        if (state.keyboardIndex < len) {
+          // Fila 1: Insertar letra/número seleccionado
+          state.wifiPassword += chars[state.keyboardIndex];
+        } else if (state.keyboardIndex === len) {
+          // Fila 2 Botón 1: Cambiar modo (abc -> ABC -> 123# -> abc) y volver a Fila 1
+          state.kbMode = (state.kbMode + 1) % 3;
+          state.keyboardIndex = 0;
+          showToast(`Teclado: Modo [${KB_MODE_NAMES[state.kbMode]}]`);
+        } else if (state.keyboardIndex === len + 1) {
+          // Fila 2 Botón 2: BORRAR
           if (state.wifiPassword.length > 0) state.wifiPassword = state.wifiPassword.slice(0, -1);
-        } else if (curKey === '👁') {
-          state.wifiShowPass = !state.wifiShowPass;
-        } else if (curKey === '✔') {
+        } else if (state.keyboardIndex === len + 2) {
+          // Fila 2 Botón 3: ENTER (Conectar al WiFi)
           startWifiConnection();
-        } else if (curKey === '◀') {
+          return;
+        } else if (state.keyboardIndex === len + 3) {
+          // Fila 2 Botón 4: SALIR
           state.currentScreen = 'WIFI_SCAN';
-        } else if (curKey === '␣') {
-          state.wifiPassword += ' ';
-        } else {
-          state.wifiPassword += curKey;
         }
         renderScreen();
         return;
@@ -2196,7 +2236,8 @@ function render(tft) {
         } else {
           state.wifiSelectedSSID = item.ssid;
           state.wifiPassword = "";
-          state.keyboardIndex = 2; // Inicia en 'a' (1 clic ▲ arriba es ⌫ Borrar, 2 clics ▲ es ✔ Conectar)
+          state.kbMode = 0;
+          state.keyboardIndex = 0; // Inicia en 'a' de Fila 1 (1 clic ▲ arriba va directo a Fila 2)
           state.currentScreen = 'WIFI_KEYBOARD';
         }
         renderScreen();
@@ -2349,8 +2390,8 @@ function render(tft) {
         } else if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
           e.preventDefault();
           state.wifiPassword += e.key;
-          // Al escribir con teclado físico, dejamos seleccionado [✔ OK!] para que al pulsar el botón ● OK conecte directo
-          state.keyboardIndex = KB_KEYS.indexOf('✔');
+          // Al escribir con teclado físico, dejamos seleccionado [✔ ENTER] de la Fila 2
+          state.keyboardIndex = KB_CHARSETS[state.kbMode].length + 2;
           renderScreen();
           return;
         }
@@ -2363,7 +2404,7 @@ function render(tft) {
     document.getElementById("btnUp").addEventListener("click", handleUp);
     document.getElementById("btnDown").addEventListener("click", handleDown);
 
-    // Soporte de pulsación corta (insertar letra) y pulsación larga de 0.6s en ● OK (conectar directo al WiFi)
+    // En teclado WiFi: Mantener presionado ● OK (0.45s) salta directo entre Fila 1 (letras) y Fila 2 (MAYUS/BORRAR/ENTER/SALIR)
     let okLongPressTimer = null;
     let okLongPressTriggered = false;
     const btnOkEl = document.getElementById("btnOk");
@@ -2375,9 +2416,16 @@ function render(tft) {
         okLongPressTimer = setTimeout(() => {
           okLongPressTriggered = true;
           pressBtnVisual("btnOk");
-          showToast("¡Conectando al WiFi (Pulsación larga OK)!");
-          startWifiConnection();
-        }, 550);
+          const len = KB_CHARSETS[state.kbMode].length;
+          if (state.keyboardIndex < len) {
+            state.keyboardIndex = len; // Salta de Fila 1 a Fila 2 ([MAYUS / 123#])
+            showToast("Saltaste a Fila 2: [MAYUS/123#] • [BORRAR] • [ENTER]");
+          } else {
+            state.keyboardIndex = 0; // Vuelve a Fila 1
+            showToast("Volviste a Fila 1: Listado de caracteres");
+          }
+          renderScreen();
+        }, 450);
       }
     }
 
@@ -2401,7 +2449,7 @@ function render(tft) {
       handleOk();
     });
 
-    // Permitir también tocar directamente los botones [⌫ Borrar], [✔ Conectar] y [◀ Volver] en la pantalla TFT (280x240)
+    // Permitir también tocar directamente los 4 botones de la Fila 2 ([MAYUS/123#], [BORRAR], [ENTER], [SALIR]) en el simulador
     canvas.addEventListener("click", (e) => {
       if (state.currentScreen !== 'WIFI_KEYBOARD') return;
       const rect = canvas.getBoundingClientRect();
@@ -2409,20 +2457,27 @@ function render(tft) {
       const scaleY = canvas.height / rect.height;
       const cx = (e.clientX - rect.left) * scaleX;
       const cy = (e.clientY - rect.top) * scaleY;
+      const len = KB_CHARSETS[state.kbMode].length;
 
-      // Zona de los 3 botones inferiores (actY = 160 a 194)
-      if (cy >= 156 && cy <= 198) {
-        if (cx >= 10 && cx <= 90) {
-          // ⌫ Borrar
-          if (state.wifiPassword.length > 0) state.wifiPassword = state.wifiPassword.slice(0, -1);
-          state.keyboardIndex = KB_KEYS.indexOf('⌫');
+      // Zona de la Fila 2 (row2Y = 150 a 190)
+      if (cy >= 146 && cy <= 194) {
+        if (cx >= 10 && cx <= 72) {
+          // Botón 1: MAYUS / 123# / abc
+          state.kbMode = (state.kbMode + 1) % 3;
+          state.keyboardIndex = 0;
+          showToast(`Teclado: Modo [${KB_MODE_NAMES[state.kbMode]}]`);
           renderScreen();
-        } else if (cx >= 96 && cx <= 184) {
-          // ✔ Conectar
-          state.keyboardIndex = KB_KEYS.indexOf('✔');
+        } else if (cx >= 76 && cx <= 138) {
+          // Botón 2: BORRAR
+          if (state.wifiPassword.length > 0) state.wifiPassword = state.wifiPassword.slice(0, -1);
+          state.keyboardIndex = KB_CHARSETS[state.kbMode].length + 1;
+          renderScreen();
+        } else if (cx >= 142 && cx <= 204) {
+          // Botón 3: ENTER
+          state.keyboardIndex = len + 2;
           startWifiConnection();
-        } else if (cx >= 190 && cx <= 270) {
-          // ◀ Volver
+        } else if (cx >= 208 && cx <= 270) {
+          // Botón 4: SALIR
           state.currentScreen = 'WIFI_SCAN';
           renderScreen();
         }
@@ -2576,9 +2631,18 @@ const char* configTitles[TOTAL_CONFIG] = {
 int selectedIndex = 0;
 int scrollOffset  = 0;
 
-const char keyboardKeys[] = "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ._-@#$%&*!? ";
-const int TOTAL_KEYS = sizeof(keyboardKeys) - 1;
-int keyboardIndex = 0;
+// Teclado WiFi de 2 Filas:
+// Fila 1: Listado de letras/números según modo activo (0=abc, 1=ABC, 2=123#)
+// Fila 2: 4 botones inferiores: [MAYUS/123#] | [BORRAR] | [ENTER] | [SALIR]
+const char* kbCharsets[3] = {
+  "abcdefghijklmnopqrstuvwxyz ",
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZ ",
+  "0123456789._-@#$%&*!?+-=/ "
+};
+const char* kbModeNames[3] = { "abc", "ABC", "123#" };
+int kbMode = 0;        // 0: minúsculas, 1: MAYÚSCULAS, 2: números/símbolos
+int keyboardIndex = 0; // < len: Fila 1 (letras) | >= len: Fila 2 (acciones)
+const int KB_ACTION_COUNT = 4;
 
 String wifiTargetSSID = "${state.savedWifiSSID || 'Mi_Casa_5G'}";
 String wifiPassword   = "${state.savedWifiPass || ''}";
@@ -2655,34 +2719,57 @@ void loop() {
   }
 
   if (currentState == STATE_WIFI_KEYBOARD) {
+    int len = strlen(kbCharsets[kbMode]);
+    int totalNav = len + KB_ACTION_COUNT; // Fila 1 (letras) + Fila 2 (4 botones inferiores)
+
     if (digitalRead(PIN_UP) == LOW) {
-      keyboardIndex = (keyboardIndex - 1 + TOTAL_KEYS + 2) % (TOTAL_KEYS + 2);
+      keyboardIndex = (keyboardIndex - 1 + totalNav) % totalNav;
       dibujarTecladoWifi();
-      delay(150);
+      delay(145);
     }
     if (digitalRead(PIN_DOWN) == LOW) {
-      keyboardIndex = (keyboardIndex + 1) % (TOTAL_KEYS + 2);
+      keyboardIndex = (keyboardIndex + 1) % totalNav;
       dibujarTecladoWifi();
-      delay(150);
+      delay(145);
     }
     if (digitalRead(PIN_OK) == LOW) {
-      // Si mantiene presionado PIN_OK (Pin 27) por 600ms, conecta directo al WiFi desde cualquier letra
+      // Pulsación larga de OK (450ms): salta directo entre la Fila 1 (letras) y la Fila 2 (botones inferiores)
       unsigned long tPress = millis();
-      while (digitalRead(PIN_OK) == LOW && (millis() - tPress) < 600) {
+      while (digitalRead(PIN_OK) == LOW && (millis() - tPress) < 450) {
         delay(10);
       }
-      if ((millis() - tPress) >= 600) {
-        conectarWifi(wifiTargetSSID, wifiPassword);
+      if ((millis() - tPress) >= 450) {
+        if (keyboardIndex < len) {
+          keyboardIndex = len; // Baja directo a Fila 2 ([MAYUS / 123#])
+        } else {
+          keyboardIndex = 0;   // Sube de vuelta a Fila 1 (primera letra)
+        }
+        dibujarTecladoWifi();
+        while (digitalRead(PIN_OK) == LOW) delay(10);
+        delay(150);
         return;
       }
 
-      if (keyboardIndex == TOTAL_KEYS) {
+      if (keyboardIndex < len) {
+        // Estamos en la Fila 1: agrega la letra/número seleccionado
+        wifiPassword += kbCharsets[kbMode][keyboardIndex];
+      } else if (keyboardIndex == len) {
+        // Botón 1 de Fila 2: Cambiar modo (abc -> ABC -> 123# -> abc) y volver a Fila 1
+        kbMode = (kbMode + 1) % 3;
+        keyboardIndex = 0;
+      } else if (keyboardIndex == len + 1) {
+        // Botón 2 de Fila 2: [BORRAR]
         if (wifiPassword.length() > 0) wifiPassword.remove(wifiPassword.length() - 1);
-      } else if (keyboardIndex == TOTAL_KEYS + 1) {
+      } else if (keyboardIndex == len + 2) {
+        // Botón 3 de Fila 2: [ENTER] (Conectar al WiFi)
         conectarWifi(wifiTargetSSID, wifiPassword);
         return;
-      } else {
-        wifiPassword += keyboardKeys[keyboardIndex];
+      } else if (keyboardIndex == len + 3) {
+        // Botón 4 de Fila 2: [SALIR]
+        currentState = STATE_CONFIGURACION;
+        dibujarPantalla();
+        delay(220);
+        return;
       }
       dibujarTecladoWifi();
       delay(180);
@@ -3024,59 +3111,119 @@ void dibujarFocusCard() {
 void dibujarTecladoWifi() {
   const ThemePalette& th = themes[currentTheme];
   tft.fillScreen(TFT_BLACK);
-  dibujarBarraEstado("TECLADO WIFI (280x240)");
+  dibujarBarraEstado("TECLADO WIFI (2 FILAS)");
 
-  tft.fillRoundRect(10, 28, 260, 52, 6, th.cardBg);
-  tft.drawRoundRect(10, 28, 260, 52, 6, th.cardBorder);
+  const char* chars = kbCharsets[kbMode];
+  int len = strlen(chars);
+
+  // Caja superior de contraseña
+  tft.fillRoundRect(10, 27, 260, 48, 6, th.cardBg);
+  tft.drawRoundRect(10, 27, 260, 48, 6, th.cardBorder);
   tft.setTextColor(th.accent, th.cardBg);
   tft.setTextSize(1);
-  tft.drawString(("Red: " + wifiTargetSSID + " (" + String(wifiPassword.length()) + ")").c_str(), 16, 32);
+  String shortSsid = wifiTargetSSID.length() > 18 ? wifiTargetSSID.substring(0, 18) : wifiTargetSSID;
+  tft.drawString(("Red: " + shortSsid).c_str(), 16, 31);
+  tft.setTextColor(th.textSecondary, th.cardBg);
+  tft.drawString((String("[") + kbModeNames[kbMode] + "]").c_str(), 222, 31);
 
   tft.setTextColor(TFT_WHITE, th.cardBg);
   String fullPass = wifiPassword + "_";
   if (fullPass.length() <= 19) {
     tft.setTextSize(2);
-    tft.drawString(fullPass.c_str(), 16, 46);
+    tft.drawString(fullPass.c_str(), 16, 45);
   } else {
     tft.setTextSize(1);
     String vis = fullPass;
     if (vis.length() > 74) vis = "<<" + vis.substring(vis.length() - 72);
     String l1 = vis.substring(0, min((unsigned int)38, vis.length()));
-    tft.drawString(l1.c_str(), 16, 46);
+    tft.drawString(l1.c_str(), 16, 44);
     if (vis.length() > 38) {
       String l2 = vis.substring(38);
       tft.setTextColor(TFT_GREEN, th.cardBg);
-      tft.drawString(l2.c_str(), 16, 60);
+      tft.drawString(l2.c_str(), 16, 57);
     }
   }
 
-  int drumY = 86;
-  tft.fillRoundRect(10, drumY, 260, 82, 8, 0x08A2);
-  tft.drawRoundRect(10, drumY, 260, 82, 8, th.cardBorder);
+  // FILA 1: TIRA HORIZONTAL DE LETRAS / NUMEROS
+  int row1Y = 82;
+  bool inRow1 = (keyboardIndex < len);
+  tft.fillRoundRect(10, row1Y, 260, 62, 8, 0x08A2);
+  tft.drawRoundRect(10, row1Y, 260, 62, 8, inRow1 ? th.accent : th.cardBorder);
 
-  int kx = 120, ky = drumY + 22;
-  tft.fillRoundRect(kx - 8, ky, 52, 36, 6, th.accentBg);
-  tft.drawRoundRect(kx - 8, ky, 52, 36, 6, th.accent);
-  tft.setTextColor(TFT_WHITE, th.accentBg);
+  tft.setTextColor(inRow1 ? th.accent : th.textSecondary, 0x08A2);
+  tft.setTextSize(1);
+  if (kbMode == 0) tft.drawString("FILA 1: MINUSCULAS (a - z)", 18, row1Y + 5);
+  else if (kbMode == 1) tft.drawString("FILA 1: MAYUSCULAS (A - Z)", 18, row1Y + 5);
+  else tft.drawString("FILA 1: NUMEROS Y SIMBOLOS (0 - 9)", 18, row1Y + 5);
 
-  if (keyboardIndex == TOTAL_KEYS) {
-    tft.setTextSize(2);
-    tft.drawString("BORR", kx - 4, ky + 10);
-  } else if (keyboardIndex == TOTAL_KEYS + 1) {
-    tft.setTextColor(TFT_GREEN, th.accentBg);
-    tft.setTextSize(2);
-    tft.drawString("OK!", kx + 2, ky + 10);
-  } else {
-    char curChar[2] = { keyboardKeys[keyboardIndex], '\\0' };
-    tft.setTextSize(3);
-    tft.drawString(curChar, kx + 10, ky + 6);
+  int centerCharIdx = inRow1 ? keyboardIndex : 0;
+  for (int offset = -3; offset <= 3; offset++) {
+    int idx = (centerCharIdx + offset + len) % len;
+    char c = chars[idx];
+    int kx = 140 + (offset * 35) - 14;
+    int ky = row1Y + 20;
+
+    if (offset == 0 && inRow1) {
+      tft.fillRoundRect(kx - 4, ky - 2, 36, 34, 6, th.accentBg);
+      tft.drawRoundRect(kx - 4, ky - 2, 36, 34, 6, th.accent);
+      tft.setTextColor(TFT_WHITE, th.accentBg);
+      if (c == ' ') {
+        tft.setTextSize(1);
+        tft.drawString("ESP", kx + 1, ky + 11);
+      } else {
+        char s[2] = { c, '\\0' };
+        tft.setTextSize(3);
+        tft.drawString(s, kx + 6, ky + 4);
+      }
+    } else {
+      tft.fillRoundRect(kx, ky + 2, 28, 26, 4, th.cardBg);
+      tft.drawRoundRect(kx, ky + 2, 28, 26, 4, th.cardBorder);
+      tft.setTextColor(th.textSecondary, th.cardBg);
+      if (c == ' ') {
+        tft.setTextSize(1);
+        tft.drawString("_", kx + 11, ky + 10);
+      } else {
+        char s[2] = { c, '\\0' };
+        tft.setTextSize(2);
+        tft.drawString(s, kx + 8, ky + 8);
+      }
+    }
   }
 
-  tft.setTextColor(TFT_WHITE, TFT_BLACK);
+  // FILA 2: BARRA INFERIOR DE ACCIONES (MAYUS/123# | BORRAR | ENTER | SALIR)
+  int row2Y = 152;
+  const char* nextModeLabel = (kbMode == 0) ? "MAYUS" : ((kbMode == 1) ? "123#" : "minus");
+  const char* btnLabels[4] = { nextModeLabel, "BORRAR", "ENTER", "SALIR" };
+  int btnX[4] = { 10, 76, 142, 208 };
+  int btnW[4] = { 62, 62, 62, 62 };
+
+  for (int b = 0; b < 4; b++) {
+    bool isSel = (keyboardIndex == len + b);
+    uint16_t bg = th.cardBg;
+    uint16_t border = th.cardBorder;
+    uint16_t txtCol = TFT_WHITE;
+
+    if (b == 2) {
+      bg = isSel ? 0x02E0 : th.cardBg;
+      border = isSel ? TFT_GREEN : th.cardBorder;
+      txtCol = TFT_GREEN;
+    } else if (isSel) {
+      bg = th.accentBg;
+      border = th.accent;
+      txtCol = TFT_WHITE;
+    }
+
+    tft.fillRoundRect(btnX[b], row2Y, btnW[b], 36, 6, bg);
+    tft.drawRoundRect(btnX[b], row2Y, btnW[b], 36, 6, border);
+    tft.setTextColor(txtCol, bg);
+    tft.setTextSize(1);
+    int tx = btnX[b] + (btnW[b] - strlen(btnLabels[b]) * 6) / 2;
+    tft.drawString(btnLabels[b], tx, row2Y + 14);
+  }
+
+  tft.setTextColor(th.textSecondary, TFT_BLACK);
   tft.setTextSize(1);
-  tft.drawString("1 clic UP desde 'a' = [OK! Conectar]", 24, 182);
-  tft.setTextColor(TFT_GREEN, TFT_BLACK);
-  tft.drawString("O manten presionado OK (0.6s)", 40, 200);
+  tft.drawString("UP/DOWN: Mover | Manten OK: Bajar a Fila 2", 14, 198);
 }
 
 void conectarWifi(String ssid, String pass) {
