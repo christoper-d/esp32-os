@@ -53,10 +53,15 @@ enum ScreenState {
   STATE_POKEMON_PLAY,
   STATE_SISTEMA_TESTS,
   STATE_CONFIGURACION,
+  STATE_WIFI_SCAN,
   STATE_WIFI_KEYBOARD,
   STATE_JS_APP
 };
 ScreenState currentState = STATE_MAIN_MENU;
+
+const int MAX_WIFI_NETS = 8;
+String scannedSSIDs[MAX_WIFI_NETS];
+int totalScannedNets = 0;
 
 struct MenuItem {
   String title;
@@ -134,6 +139,7 @@ void animacionInicio();
 void sincronizarDesdeGitHub();
 bool descargarArchivoGitHub(const char* rutaRelativa);
 void ejecutarScriptJS(String scriptPath);
+void escanearRedesWifi();
 void dibujarPantalla();
 void ejecutarSeleccion();
 void dibujarTecladoWifi();
@@ -237,6 +243,7 @@ void loop() {
   if (currentState == STATE_G4BRIEL_GAMEBOY) maxItems = TOTAL_GAMEBOY;
   else if (currentState == STATE_SISTEMA_TESTS) maxItems = TOTAL_SYS_TESTS;
   else if (currentState == STATE_CONFIGURACION) maxItems = TOTAL_CONFIG;
+  else if (currentState == STATE_WIFI_SCAN) maxItems = totalScannedNets;
 
   if (digitalRead(PIN_UP) == LOW) {
     selectedIndex = (selectedIndex > 0) ? (selectedIndex - 1) : (maxItems - 1);
@@ -473,6 +480,7 @@ void dibujarListaSlim() {
   if (currentState == STATE_G4BRIEL_GAMEBOY) { total = TOTAL_GAMEBOY; header = "G4BRIEL - GAMEBOY"; }
   else if (currentState == STATE_SISTEMA_TESTS) { total = TOTAL_SYS_TESTS; header = "SISTEMA & TESTS"; }
   else if (currentState == STATE_CONFIGURACION) { total = TOTAL_CONFIG; header = "CONFIGURACION"; }
+  else if (currentState == STATE_WIFI_SCAN) { total = totalScannedNets; header = "SELECCIONAR WIFI"; }
   dibujarBarraEstado(header);
 
   if (selectedIndex < scrollOffset) scrollOffset = selectedIndex;
@@ -497,6 +505,8 @@ void dibujarListaSlim() {
       label = String(sysTestTitles[itemIdx]);
     } else if (currentState == STATE_CONFIGURACION) {
       label = String(configTitles[itemIdx]);
+    } else if (currentState == STATE_WIFI_SCAN) {
+      label = scannedSSIDs[itemIdx];
     }
 
     if (isSel) {
@@ -535,6 +545,10 @@ void dibujarFocusCard() {
     header = "CONFIGURACION";
     curTitle = String(configTitles[selectedIndex]);
     curSub = "OK para cambiar";
+  } else if (currentState == STATE_WIFI_SCAN) {
+    header = "SELECCIONAR WIFI";
+    curTitle = scannedSSIDs[selectedIndex];
+    curSub = "OK para elegir esta red";
   }
   dibujarBarraEstado(header);
 
@@ -608,6 +622,26 @@ void dibujarTecladoWifi() {
   tft.drawString("1 clic UP desde 'a' = [OK! Conectar]", 12, 195);
   tft.setTextColor(TFT_GREEN, TFT_BLACK);
   tft.drawString("O manten presionado OK (0.6s)", 24, 214);
+}
+
+void escanearRedesWifi() {
+  tft.fillScreen(TFT_BLACK);
+  dibujarBarraEstado("BUSCANDO WIFI...");
+  tft.setTextColor(TFT_WHITE, TFT_BLACK);
+  tft.setTextSize(2);
+  tft.drawString("Escaneando...", 40, 110);
+
+  int n = WiFi.scanNetworks();
+  totalScannedNets = 0;
+  for (int i = 0; i < n && totalScannedNets < (MAX_WIFI_NETS - 1); i++) {
+    scannedSSIDs[totalScannedNets++] = WiFi.SSID(i).substring(0, 16);
+  }
+  scannedSSIDs[totalScannedNets++] = "< Volver";
+
+  currentState = STATE_WIFI_SCAN;
+  selectedIndex = 0;
+  scrollOffset = 0;
+  dibujarPantalla();
 }
 
 void conectarWifi(String ssid, String pass) {
@@ -701,11 +735,25 @@ void ejecutarSeleccion() {
     return;
   }
 
-  if (currentState == STATE_CONFIGURACION) {
-    if (selectedIndex == 0) {
+  if (currentState == STATE_WIFI_SCAN) {
+    if (selectedIndex == totalScannedNets - 1) {
+      currentState = STATE_CONFIGURACION;
+      selectedIndex = 0;
+      scrollOffset = 0;
+      dibujarPantalla();
+    } else {
+      wifiTargetSSID = scannedSSIDs[selectedIndex];
+      wifiPassword = "";
       currentState = STATE_WIFI_KEYBOARD;
       keyboardIndex = 0;
       dibujarTecladoWifi();
+    }
+    return;
+  }
+
+  if (currentState == STATE_CONFIGURACION) {
+    if (selectedIndex == 0) {
+      escanearRedesWifi();
     } else if (selectedIndex == 1) {
       sincronizarDesdeGitHub();
     } else if (selectedIndex == 2) {
