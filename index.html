@@ -1,0 +1,3223 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>G4BRIEL OS • Motor JS + GitHub OTA para ESP32 (TFT 1.69" 240x280)</title>
+  <style>
+    :root {
+      --bg-main: #0a0c10;
+      --bg-card: #12161f;
+      --bg-panel: #1a202c;
+      --border: #2d3748;
+      --accent: #ff8c00;
+      --cyan: #00d8d6;
+      --green: #2ecc71;
+      --text: #f7fafc;
+      --text-muted: #a0aec0;
+      --danger: #e74c3c;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    body {
+      background: var(--bg-main);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 18px;
+      max-width: 960px;
+      width: 100%;
+    }
+
+    header h1 {
+      font-size: 1.65rem;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    header h1 span {
+      background: linear-gradient(135deg, #ff8c00, #ffc048);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .badge-pill {
+      background: rgba(0, 216, 214, 0.15);
+      color: var(--cyan);
+      border: 1px solid rgba(0, 216, 214, 0.3);
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    header p {
+      color: var(--text-muted);
+      font-size: 0.88rem;
+      margin-top: 6px;
+    }
+
+    .main-layout {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 24px;
+      justify-content: center;
+      max-width: 1260px;
+      width: 100%;
+      align-items: flex-start;
+    }
+
+    /* Hardware Display Unit */
+    .simulator-container {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 22px 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+      position: sticky;
+      top: 15px;
+      user-select: none;
+    }
+
+    .screen-bezel {
+      background: #000;
+      border: 10px solid #1c202a;
+      border-radius: 32px;
+      padding: 10px;
+      box-shadow: inset 0 0 15px rgba(255, 255, 255, 0.04),
+                  0 12px 30px rgba(0, 0, 0, 0.9),
+                  0 0 0 1px rgba(255, 255, 255, 0.1);
+      position: relative;
+    }
+
+    .screen-inner-frame {
+      border-radius: 20px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: #000;
+      position: relative;
+    }
+
+    #tftCanvas {
+      display: block;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+
+    .screen-glare {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.01) 40%, transparent 60%);
+      border-radius: 20px;
+    }
+
+    .screen-badge {
+      font-size: 0.72rem;
+      letter-spacing: 0.8px;
+      color: #718096;
+      text-transform: uppercase;
+      font-weight: 600;
+      margin-top: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .led-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #2ecc71;
+      box-shadow: 0 0 8px #2ecc71;
+    }
+
+    .zoom-ctrls {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      margin-top: 8px;
+    }
+
+    .zoom-btn {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .zoom-btn.active {
+      background: var(--accent);
+      color: #000;
+      border-color: var(--accent);
+    }
+
+    .action-sub-buttons {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .btn-action-mini {
+      background: rgba(255, 140, 0, 0.15);
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      padding: 5px 10px;
+      border-radius: 8px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      transition: all 0.2s;
+    }
+
+    .btn-action-mini:hover {
+      background: var(--accent);
+      color: #000;
+    }
+
+    /* Hardware Buttons */
+    .buttons-container {
+      margin-top: 16px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .buttons-row {
+      display: flex;
+      gap: 14px;
+      justify-content: center;
+    }
+
+    .hw-btn {
+      width: 74px;
+      height: 62px;
+      background: linear-gradient(180deg, #2d3748 0%, #1a202c 100%);
+      color: #f7fafc;
+      border: 2px solid #4a5568;
+      border-radius: 14px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.92rem;
+      box-shadow: 0 5px 0 #0d1117, 0 8px 15px rgba(0,0,0,0.4);
+      transition: all 0.08s ease;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .hw-btn:active, .hw-btn.pressed {
+      transform: translateY(4px);
+      box-shadow: 0 1px 0 #0d1117, 0 3px 6px rgba(0,0,0,0.3);
+      background: #4a5568;
+      border-color: var(--accent);
+    }
+
+    .hw-btn .pin-tag {
+      font-size: 0.65rem;
+      color: #a0aec0;
+      margin-top: 2px;
+      font-weight: 500;
+    }
+
+    .hw-btn.btn-ok {
+      width: 88px;
+      border-color: #ff8c00;
+      background: linear-gradient(180deg, #442a15 0%, #29180b 100%);
+      color: #ffaa55;
+      box-shadow: 0 5px 0 #150c05, 0 8px 15px rgba(255, 140, 0, 0.2);
+    }
+
+    .hw-btn.btn-ok:active, .hw-btn.btn-ok.pressed {
+      background: #ff8c00;
+      color: #000;
+    }
+
+    .key-hints {
+      font-size: 0.74rem;
+      color: var(--text-muted);
+      text-align: center;
+      background: rgba(255, 255, 255, 0.05);
+      padding: 6px 12px;
+      border-radius: 16px;
+    }
+
+    .key-hints kbd {
+      background: #2d3748;
+      border: 1px solid #4a5568;
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-family: monospace;
+      color: #ffc048;
+    }
+
+    /* Right Panel: Pure JS Logic & Ready-to-Flash ESP32 Firmware */
+    .editor-container {
+      flex: 1;
+      min-width: 320px;
+      max-width: 680px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .panel-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .panel-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 10px;
+    }
+
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 9px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 0.9rem;
+      transition: all 0.2s;
+      flex: 1;
+      text-align: center;
+    }
+
+    .tab-btn.active {
+      background: var(--bg-panel);
+      color: var(--accent);
+      border: 1px solid rgba(255, 140, 0, 0.35);
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    .form-group {
+      margin-bottom: 14px;
+    }
+
+    .form-group label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .val-badge {
+      color: var(--cyan);
+      font-family: monospace;
+      font-size: 0.8rem;
+      text-transform: none;
+    }
+
+    .input-text, .input-select {
+      width: 100%;
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 9px 12px;
+      border-radius: 8px;
+      font-size: 0.88rem;
+      outline: none;
+    }
+
+    .input-text:focus {
+      border-color: var(--accent);
+    }
+
+    .file-pills {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+
+    .file-pill {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-family: monospace;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.15s;
+    }
+
+    .file-pill.active {
+      background: rgba(0, 216, 214, 0.14);
+      color: var(--cyan);
+      border-color: var(--cyan);
+    }
+
+    .code-box {
+      background: #080b10;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 0.82rem;
+      color: #e2e8f0;
+      overflow-x: auto;
+      line-height: 1.5;
+      width: 100%;
+    }
+
+    textarea.code-box {
+      height: 310px;
+      resize: vertical;
+      outline: none;
+      color: #00e5ff;
+    }
+
+    textarea.code-box:focus {
+      border-color: var(--cyan);
+    }
+
+    pre.code-box {
+      max-height: 490px;
+      white-space: pre;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #000;
+      border: none;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 0.86rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-primary:hover {
+      filter: brightness(1.1);
+    }
+
+    .btn-copy {
+      background: var(--green);
+      color: #000;
+      border: none;
+      padding: 9px 16px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 0.85rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-secondary {
+      background: var(--bg-panel);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 9px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.84rem;
+      font-weight: 600;
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .api-help {
+      margin-top: 14px;
+      background: #0d1118;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      line-height: 1.55;
+    }
+
+    .api-help code {
+      color: #ffc048;
+      font-family: monospace;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 25px;
+      background: #2ecc71;
+      color: #000;
+      padding: 10px 24px;
+      border-radius: 30px;
+      font-weight: 700;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.5);
+      opacity: 0;
+      transform: translateY(20px);
+      transition: all 0.3s;
+      pointer-events: none;
+      z-index: 999;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>G4BRIEL OS <span>Motor JS + GitHub OTA</span> <span class="badge-pill">ESP32 + TFT 1.69"</span></h1>
+    <p>Programa la lógica de inicio, el orden de los menús y tus apps en JS para tu repo de GitHub. Flashea el C++ una sola vez.</p>
+  </header>
+
+  <div class="main-layout">
+
+    <!-- PANTALLA TFT 240x280 Y LOS 3 BOTONES -->
+    <div class="simulator-container">
+      <div class="screen-bezel">
+        <div class="screen-inner-frame">
+          <canvas id="tftCanvas" width="240" height="280"></canvas>
+          <div class="screen-glare"></div>
+        </div>
+      </div>
+
+      <div class="screen-badge">
+        <span class="led-dot"></span>
+        <span>1.69" IPS • 240x280 • ST7789V2</span>
+      </div>
+
+      <div class="zoom-ctrls">
+        <span style="font-size: 0.75rem; color: var(--text-muted);">Zoom:</span>
+        <button class="zoom-btn" onclick="setZoom(1, this)">1x</button>
+        <button class="zoom-btn active" onclick="setZoom(1.4, this)">1.4x</button>
+        <button class="zoom-btn" onclick="setZoom(1.8, this)">1.8x</button>
+        <button class="zoom-btn" onclick="setZoom(2.2, this)">2.2x</button>
+      </div>
+
+      <div class="action-sub-buttons">
+        <button class="btn-action-mini" onclick="triggerBootAnimation()">
+          ⚡ Reiniciar (boot.js)
+        </button>
+        <button class="btn-action-mini" onclick="startGithubSyncScreen()">
+          🐙 Sync GitHub
+        </button>
+        <button class="btn-action-mini" onclick="startWifiFromButton()">
+          📶 WiFi NVS
+        </button>
+      </div>
+
+      <!-- 3 BOTONES FÍSICOS -->
+      <div class="buttons-container">
+        <div class="buttons-row">
+          <button class="hw-btn" id="btnUp">
+            <span>▲ UP</span>
+            <span class="pin-tag">Pin 25</span>
+          </button>
+
+          <button class="hw-btn btn-ok" id="btnOk">
+            <span>● OK</span>
+            <span class="pin-tag">Pin 27</span>
+          </button>
+
+          <button class="hw-btn" id="btnDown">
+            <span>▼ DOWN</span>
+            <span class="pin-tag">Pin 26</span>
+          </button>
+        </div>
+
+        <div class="key-hints">
+          Teclado PC: <kbd>↑</kbd> Subir &nbsp;|&nbsp; <kbd>↓</kbd> Bajar &nbsp;|&nbsp; <kbd>Enter</kbd> OK
+        </div>
+      </div>
+    </div>
+
+    <!-- PANEL DERECHO: SOLO LÓGICA JS (GITHUB REPO) Y FIRMWARE C++ FINAL -->
+    <div class="editor-container">
+      <div class="panel-card">
+        <div class="panel-tabs">
+          <button class="tab-btn active" onclick="switchTab('tab-js', this)">🧠 Lógica JS & Repo GitHub</button>
+          <button class="tab-btn" onclick="switchTab('tab-cpp', this)">💻 Firmware ESP32 (Listo para Subir)</button>
+        </div>
+
+        <!-- PESTAÑA 1: LÓGICA JS DEL REPOSITORIO GITHUB -->
+        <div id="tab-js" class="tab-content active">
+          <div class="form-group">
+            <label>
+              <span>URL Raw de tu Repositorio en GitHub:</span>
+              <span class="val-badge">Descarga por HTTPS al ESP32</span>
+            </label>
+            <input type="text" id="cfgGithubUrl" class="input-text" value="https://raw.githubusercontent.com/christoper-d/esp32-os/main">
+          </div>
+
+          <div class="form-group" style="margin-bottom: 8px;">
+            <label>
+              <span>Archivos de tu Repo GitHub (Click para editar su lógica):</span>
+              <button class="btn-secondary" style="padding: 3px 9px; font-size: 0.74rem;" onclick="createNewJsAppFile()">+ Nuevo Script .js</button>
+            </label>
+            <div class="file-pills" id="filePillsContainer"></div>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 8px;">
+            <label>
+              <span id="currentFileLabel">Editando: manifest.json</span>
+              <span class="val-badge" id="currentFileHint">Define el orden de los menús y el diseño</span>
+            </label>
+            <textarea id="jsCodeEditor" class="code-box" spellcheck="false"></textarea>
+          </div>
+
+          <div class="btn-row">
+            <button class="btn-primary" onclick="saveAndRunCurrentJs()">
+              ▶ Guardar Lógica & Probar en Pantalla
+            </button>
+            <button class="btn-secondary" onclick="startGithubSyncScreen()">
+              🐙 Simular Descarga OTA desde GitHub
+            </button>
+            <button class="btn-secondary" onclick="copyCurrentJsFile()">
+              📋 Copiar este Archivo
+            </button>
+          </div>
+
+          <div class="api-help">
+            <strong style="color:#fff;">API JS soportada tanto en el Simulador como en el ESP32:</strong><br>
+            • En <code>manifest.json</code>: Cambia el orden de <code>menu_order</code>, el <code>layout</code> (<code>"smart_list"</code> o <code>"focus_card"</code>) y el <code>theme</code> (<code>"cyber_orange"</code>, <code>"neon_cyan"</code>, <code>"matrix_green"</code>, <code>"minimal_white"</code>).<br>
+            • En <code>boot.js</code>: Define <code>logo</code>, <code>subtitle</code> y el arreglo <code>steps</code> que se muestran en la animación al encender.<br>
+            • En cualquier <code>apps/*.js</code>: Usa comandos de dibujo como <code>tft.statusBar("TITULO")</code>, <code>tft.card(x, y, w, h)</code>, <code>tft.text("Hola", x, y, tam, "#FFFFFF")</code>, <code>tft.rect(x, y, w, h, "#FF8C00")</code>, <code>tft.circle(x, y, r, "#00E5FF")</code>.
+          </div>
+        </div>
+
+        <!-- PESTAÑA 2: CÓDIGO ARDUINO C++ LISTO PARA FLASHEAR 1 SOLA VEZ -->
+        <div id="tab-cpp" class="tab-content">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px;">
+            <div style="font-size:0.82rem; color:var(--text-muted);">
+              Sube este sketch <b>una sola vez</b> a tu ESP32. Incluye WiFi NVS, Teclado 3 botones, Config UI y descarga HTTPS de tus <code>.js</code> desde GitHub:
+            </div>
+            <button class="btn-copy" onclick="copyArduinoCode()">📋 Copiar Firmware C++</button>
+          </div>
+          <pre class="code-box" id="arduinoCodeBox"></pre>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <div id="toast" class="toast">Listo</div>
+
+  <script>
+    // =========================================================================
+    // ARCHIVOS VIRTUALES DEL REPOSITORIO GITHUB (LÓGICA JS & MANIFEST)
+    // =========================================================================
+    const REPO_FILES = {
+      "manifest.json": JSON.stringify({
+        os_name: "G4BRIEL OS",
+        menu_title: "SISTEMA 1.69",
+        boot_script: "apps/boot.js",
+        layout: "smart_list",
+        theme: "cyber_orange",
+        menu_order: [
+          { id: "diag",        title: "g4briel",         icon: "🎮", sub: "GameBoy: Amarillo, Azul, Rojo", script: "apps/g4briel.js" },
+          { id: "config",      title: "Configuración",   icon: "⚙️", sub: "WiFi NVS, UI y Color",          script: "system://config" },
+          { id: "github_sync", title: "GitHub Sync",     icon: "🔄", sub: "Descargar .js del repo",         script: "system://github_sync" },
+          { id: "monitor",     title: "Monitor ADC",     icon: "📊", sub: "Osciloscopio GPIO34",           script: "apps/monitor.js" },
+          { id: "info",        title: "Sistema & Tests", icon: "🩺", sub: "Tests RGB, Botones y Flash",    script: "apps/sysinfo.js" }
+        ]
+      }, null, 2),
+
+      "apps/boot.js": `// =========================================================
+// apps/boot.js - Se ejecuta apenas enciende el ESP32
+// Puedes cambiar el título, subtítulo y pasos de carga:
+// =========================================================
+const bootConfig = {
+  logo: "G4BRIEL OS",
+  subtitle: "JS Engine • GitHub OTA",
+  steps: [
+    "Iniciando SPI & LittleFS...",
+    "Leyendo WiFi de NVS Flash...",
+    "Sincronizando manifest.json...",
+    "Cargando ROMs GameBoy...",
+    "¡G4BRIEL OS Listo!"
+  ]
+};`,
+
+      "apps/g4briel.js": `// =========================================================
+// apps/g4briel.js - Menú de Juegos GameBoy Color (Pokémon)
+// Cada juego tiene su color propio en el menú y es jugable
+// =========================================================
+const diagApp = {
+  title: "G4BRIEL • GAMEBOY",
+  items: [
+    { id: "poke_yellow", title: "Pokémon Amarillo", icon: "⚡", sub: "GBC • Ed. Pikachu",   color: "#FFEA00" },
+    { id: "poke_blue",   title: "Pokémon Azul",     icon: "💧", sub: "GBC • Ed. Blastoise", color: "#00E5FF" },
+    { id: "poke_red",    title: "Pokémon Rojo",     icon: "🔥", sub: "GBC • Ed. Charizard", color: "#FF3D00" },
+    { id: "back",        title: "◀ Volver al Menú", icon: "↩️", sub: "Salir al sistema" }
+  ]
+};`,
+
+      "apps/monitor.js": `// =========================================================
+// apps/monitor.js - Configuración del Osciloscopio ADC
+// =========================================================
+function render(tft) {
+  tft.statusBar("MONITOR ADC EN VIVO");
+  tft.oscilloscope(10, 40, 220, 170, "#00E676");
+  tft.card(10, 218, 220, 50);
+  tft.text("CH1: ADC_GPIO34 (ESP32)", 18, 224, 1, "#A0AEC0");
+  tft.text("VALOR: 2.14V / 2650", 18, 238, 2, "#FF8C00");
+  tft.text("FREC: 50.0 Hz   [OK=Salir]", 18, 254, 1, "#A0AEC0");
+}`,
+
+      "apps/sysinfo.js": `// =========================================================
+// apps/sysinfo.js - Pruebas de Pantalla, Botones y Memoria
+// (Movimos aquí las pruebas de hardware)
+// =========================================================
+const sysApp = {
+  title: "SISTEMA & TESTS",
+  items: [
+    { id: "test_rgb", title: "Test Pantalla RGB", icon: "🎨", sub: "Probar píxeles IPS" },
+    { id: "test_btn", title: "Test 3 Botones",    icon: "🕹️", sub: "Pines 25, 26 y 27" },
+    { id: "test_mem", title: "Memoria & Scripts", icon: "💻", sub: "LittleFS y RAM ESP32" },
+    { id: "back",     title: "◀ Volver al Menú",  icon: "↩️", sub: "Regresar al inicio" }
+  ]
+};`
+    };
+
+    let currentEditingFile = "manifest.json";
+
+    // Paleta de colores TFT_eSPI
+    const TFT_COLORS = {
+      BLACK:   "#000000",
+      GREY:    "#7F7F7F",
+      WHITE:   "#FFFFFF",
+      ORANGE:  "#FF8C00",
+      GREEN:   "#00E676",
+      CYAN:    "#00E5FF",
+      RED:     "#FF3D00",
+      YELLOW:  "#FFEA00"
+    };
+
+    const THEMES = {
+      cyber_orange: {
+        name: "Naranja",
+        accent: "#FF8C00",
+        accentBg: "#291800",
+        accentBorder: "#FF8C00",
+        cardBg: "#12141a",
+        cardBorder: "#2a303c",
+        textPrimary: "#FFFFFF",
+        textSecondary: "#A0AEC0",
+        topBarBg: "#0f1118"
+      },
+      neon_cyan: {
+        name: "Cian",
+        accent: "#00E5FF",
+        accentBg: "#002029",
+        accentBorder: "#00E5FF",
+        cardBg: "#0b121b",
+        cardBorder: "#1a2c3d",
+        textPrimary: "#FFFFFF",
+        textSecondary: "#8ab0d0",
+        topBarBg: "#080e16"
+      },
+      matrix_green: {
+        name: "Verde",
+        accent: "#00E676",
+        accentBg: "#00240c",
+        accentBorder: "#00E676",
+        cardBg: "#0a130d",
+        cardBorder: "#193620",
+        textPrimary: "#E8FFE8",
+        textSecondary: "#76a680",
+        topBarBg: "#061008"
+      },
+      minimal_white: {
+        name: "Blanco",
+        accent: "#FFFFFF",
+        accentBg: "#2d333b",
+        accentBorder: "#FFFFFF",
+        cardBg: "#161b22",
+        cardBorder: "#30363d",
+        textPrimary: "#FFFFFF",
+        textSecondary: "#8b949e",
+        topBarBg: "#0d1117"
+      }
+    };
+
+    const KB_KEYS = [
+      '✔', '⌫',
+      'a','b','c','d','e','f','g','h','i','j','k','l','m','n','ñ','o','p','q','r','s','t','u','v','w','x','y','z',
+      '0','1','2','3','4','5','6','7','8','9',
+      'A','B','C','D','E','F','G','H','I','J','K','L','M','N','Ñ','O','P','Q','R','S','T','U','V','W','X','Y','Z',
+      '.','_','-','@','#','$','%','&','*','!','?','␣',
+      '👁', '◀'
+    ];
+
+    const storedSSID = localStorage.getItem("g4briel_wifi_ssid") || "Mi_Casa_5G";
+    const storedPass = localStorage.getItem("g4briel_wifi_pass") || "g4briel2026";
+    const hasStored = !!localStorage.getItem("g4briel_wifi_ssid");
+
+    const state = {
+      layoutMode: 'smart_list',
+      currentScreen: 'MAIN_MENU',
+      opcionActual: 0,
+      scrollOffset: 0,
+      menuTitle: "SISTEMA 1.69",
+      themeKey: "cyber_orange",
+      brightnessValue: 80,
+      invertDisplay: true,
+      lastBtnPressed: "Ninguno",
+      rgbTestStep: 0,
+      batteryLevel: 85,
+      rowH: 35,
+      itemW: 206,
+      spacing: 5,
+      monitorWaveData: new Array(40).fill(120),
+      wifiConnected: hasStored,
+      wifiIP: "192.168.1.108",
+      wifiSelectedSSID: storedSSID,
+      wifiPassword: storedPass,
+      savedWifiSSID: storedSSID,
+      savedWifiPass: storedPass,
+      hasSavedWifi: hasStored,
+      wifiShowPass: true,
+      wifiScanIndex: 0,
+      keyboardIndex: 0,
+      wifiScanList: [],
+      githubRepoUrl: "https://raw.githubusercontent.com/christoper-d/esp32-os/main",
+      bootLogoText: "G4BRIEL OS",
+      bootSubText: "JS Engine • GitHub OTA",
+      bootSteps: [
+        "Iniciando SPI & LittleFS...",
+        "Leyendo WiFi de NVS Flash...",
+        "Sincronizando manifest.json...",
+        "Cargando ROMs GameBoy...",
+        "¡G4BRIEL OS Listo!"
+      ],
+      githubSyncProgress: 0,
+      githubSyncFile: "manifest.json",
+      activeScriptPath: "apps/sysinfo.js",
+      // Estado del Emulador GameBoy Pokémon
+      activePokemonGame: "poke_yellow",
+      gbActionIndex: 0,
+      gbEnemyHP: 100,
+      gbPlayerHP: 100,
+      gbBattleMsg: "¡Un MEWTWO salvaje apareció!",
+      mainMenuItems: [],
+      diagMenuItems: [
+        { id: "poke_yellow", title: "Pokémon Amarillo", icon: "⚡", sub: "GBC • Ed. Pikachu",   color: "#FFEA00" },
+        { id: "poke_blue",   title: "Pokémon Azul",     icon: "💧", sub: "GBC • Ed. Blastoise", color: "#00E5FF" },
+        { id: "poke_red",    title: "Pokémon Rojo",     icon: "🔥", sub: "GBC • Ed. Charizard", color: "#FF3D00" },
+        { id: "back",        title: "◀ Volver al Menú", icon: "↩️", sub: "Salir al sistema" }
+      ],
+      sysMenuItems: [
+        { id: "test_rgb", title: "Test Pantalla RGB", icon: "🎨", sub: "Probar píxeles IPS" },
+        { id: "test_btn", title: "Test 3 Botones",    icon: "🕹️", sub: "Pines 25, 26 y 27" },
+        { id: "test_mem", title: "Memoria & Scripts", icon: "💻", sub: "LittleFS y RAM ESP32" },
+        { id: "back",     title: "◀ Volver al Menú",  icon: "↩️", sub: "Regresar al inicio" }
+      ],
+      configMenuItems: [
+        { id: "cfg_wifi",   title: "Conectar WiFi",  icon: "📶", isWifiBtn: true },
+        { id: "cfg_github", title: "Sync GitHub JS", icon: "🔄", isGithubBtn: true },
+        { id: "cfg_mode",   title: "Estilo UI",      icon: "📐", isModeToggle: true },
+        { id: "cfg_theme",  title: "Tema Color",     icon: "🎨", isThemeToggle: true },
+        { id: "cfg_bright", title: "Brillo",         icon: "💡", isSlider: true },
+        { id: "back",       title: "◀ Volver",       icon: "↩️" }
+      ]
+    };
+
+    const canvas = document.getElementById("tftCanvas");
+    const ctx = canvas.getContext("2d");
+
+    // =========================================================================
+    // PARSEAR Y EJECUTAR LA LÓGICA DE LOS ARCHIVOS JS / MANIFEST
+    // =========================================================================
+    function applyAllRepoFilesToState() {
+      // 1. Parsear manifest.json
+      try {
+        const manifest = JSON.parse(REPO_FILES["manifest.json"]);
+        if (manifest.os_name) state.bootLogoText = manifest.os_name;
+        if (manifest.menu_title) state.menuTitle = manifest.menu_title;
+        if (manifest.layout && (manifest.layout === 'smart_list' || manifest.layout === 'focus_card')) {
+          state.layoutMode = manifest.layout;
+        }
+        if (manifest.theme && THEMES[manifest.theme]) {
+          state.themeKey = manifest.theme;
+        }
+        if (Array.isArray(manifest.menu_order)) {
+          state.mainMenuItems = manifest.menu_order.map(m => ({
+            id: m.id || "app",
+            title: m.title || "App",
+            icon: m.icon || "⚙️",
+            sub: m.sub || "",
+            script: m.script || `apps/${m.id}.js`
+          }));
+        }
+      } catch (e) {
+        console.warn("Error en manifest.json:", e);
+      }
+
+      // 2. Parsear apps/boot.js
+      try {
+        const bootSrc = REPO_FILES["apps/boot.js"] || "";
+        const fn = new Function(bootSrc + "\nreturn typeof bootConfig !== 'undefined' ? bootConfig : null;");
+        const cfg = fn();
+        if (cfg) {
+          if (cfg.logo) state.bootLogoText = cfg.logo;
+          if (cfg.subtitle) state.bootSubText = cfg.subtitle;
+          if (Array.isArray(cfg.steps) && cfg.steps.length > 0) state.bootSteps = cfg.steps;
+        }
+      } catch (e) {
+        console.warn("Error en apps/boot.js:", e);
+      }
+
+      // 3. Parsear apps/g4briel.js (Menú GameBoy Pokémon)
+      try {
+        const diagSrc = REPO_FILES["apps/g4briel.js"] || "";
+        const fn = new Function(diagSrc + "\nreturn typeof diagApp !== 'undefined' ? diagApp : null;");
+        const dApp = fn();
+        if (dApp && Array.isArray(dApp.items)) {
+          state.diagMenuItems = dApp.items;
+        }
+      } catch (e) {
+        console.warn("Error en apps/g4briel.js:", e);
+      }
+
+      // 4. Parsear apps/sysinfo.js (Menú Sistema & Pruebas de Hardware)
+      try {
+        const sysSrc = REPO_FILES["apps/sysinfo.js"] || "";
+        const fn = new Function(sysSrc + "\nreturn typeof sysApp !== 'undefined' ? sysApp : null;");
+        const sApp = fn();
+        if (sApp && Array.isArray(sApp.items)) {
+          state.sysMenuItems = sApp.items;
+        }
+      } catch (e) {
+        console.warn("Error en apps/sysinfo.js:", e);
+      }
+    }
+
+    function renderFilePills() {
+      const container = document.getElementById("filePillsContainer");
+      container.innerHTML = "";
+      Object.keys(REPO_FILES).forEach(fileName => {
+        const btn = document.createElement("button");
+        btn.className = "file-pill" + (fileName === currentEditingFile ? " active" : "");
+        btn.textContent = fileName;
+        btn.onclick = () => selectFileToEdit(fileName);
+        container.appendChild(btn);
+      });
+    }
+
+    function selectFileToEdit(fileName) {
+      // Guardar cambios actuales en memoria antes de cambiar de pestaña de archivo
+      REPO_FILES[currentEditingFile] = document.getElementById("jsCodeEditor").value;
+      currentEditingFile = fileName;
+      document.getElementById("jsCodeEditor").value = REPO_FILES[fileName] || "";
+      document.getElementById("currentFileLabel").textContent = `Editando: ${fileName}`;
+
+      let hint = "Script JS ejecutable en pantalla TFT";
+      if (fileName === "manifest.json") hint = "Define el orden de los menús, tema y modo visual";
+      else if (fileName === "apps/boot.js") hint = "Se ejecuta al encender el ESP32 antes de entrar al menú";
+      document.getElementById("currentFileHint").textContent = hint;
+
+      renderFilePills();
+    }
+
+    function saveAndRunCurrentJs() {
+      REPO_FILES[currentEditingFile] = document.getElementById("jsCodeEditor").value;
+      applyAllRepoFilesToState();
+      generateArduinoCode();
+
+      if (currentEditingFile === "apps/boot.js") {
+        triggerBootAnimation();
+        showToast("Ejecutando animación de apps/boot.js");
+      } else if (currentEditingFile === "manifest.json") {
+        state.currentScreen = 'MAIN_MENU';
+        state.opcionActual = 0;
+        state.scrollOffset = 0;
+        renderScreen();
+        showToast("Orden de menús y estilo actualizados desde manifest.json");
+      } else if (currentEditingFile === "apps/g4briel.js") {
+        state.currentScreen = 'SUB_DIAG';
+        state.opcionActual = 0;
+        state.scrollOffset = 0;
+        renderScreen();
+        showToast("Menú GameBoy Pokémon (g4briel.js) actualizado en pantalla");
+      } else if (currentEditingFile === "apps/sysinfo.js") {
+        state.currentScreen = 'SUB_SYS';
+        state.opcionActual = 0;
+        state.scrollOffset = 0;
+        renderScreen();
+        showToast("Submenú Sistema & Tests (sysinfo.js) actualizado en pantalla");
+      } else if (currentEditingFile === "apps/monitor.js") {
+        state.currentScreen = 'SUB_MONITOR';
+        startMonitorSimulation();
+        showToast("Ejecutando apps/monitor.js");
+      } else {
+        state.activeScriptPath = currentEditingFile;
+        state.currentScreen = 'JS_SCRIPT_VIEW';
+        renderScreen();
+        showToast(`Ejecutando ${currentEditingFile} en la pantalla TFT`);
+      }
+    }
+
+    function createNewJsAppFile() {
+      const name = prompt("Nombre del nuevo archivo JS (ej: reloj.js o juegos.js):", "reloj.js");
+      if (!name) return;
+      const cleanName = name.startsWith("apps/") ? name : `apps/${name.replace(/\.js$/, "")}.js`;
+      const baseTitle = cleanName.replace("apps/", "").replace(".js", "");
+      const capTitle = baseTitle.charAt(0).toUpperCase() + baseTitle.slice(1);
+
+      REPO_FILES[cleanName] = `// =========================================================
+// ${cleanName} - App JS descargable desde tu Repo de GitHub
+// =========================================================
+function render(tft) {
+  tft.statusBar("${capTitle.toUpperCase()}");
+  tft.card(12, 36, 216, 170);
+  tft.circle(120, 90, 26, "#00E5FF");
+  tft.text("APP: ${capTitle}", 58, 130, 2, "#FFFFFF");
+  tft.text("Ejecutando /${cleanName}", 28, 158, 1, "#FF8C00");
+  tft.text("Desde memoria LittleFS", 42, 178, 1, "#00E676");
+
+  tft.rect(20, 224, 200, 36, "#FF8C00");
+  tft.text("● OK: Volver al Menú", 46, 236, 1, "#FFFFFF");
+}`;
+
+      // Agregar automáticamente al manifest.json
+      try {
+        const manifest = JSON.parse(REPO_FILES["manifest.json"]);
+        manifest.menu_order.push({
+          id: baseTitle,
+          title: capTitle,
+          icon: "💡",
+          sub: "App JS de GitHub",
+          script: cleanName
+        });
+        REPO_FILES["manifest.json"] = JSON.stringify(manifest, null, 2);
+      } catch (e) {}
+
+      applyAllRepoFilesToState();
+      selectFileToEdit(cleanName);
+      saveAndRunCurrentJs();
+    }
+
+    function copyCurrentJsFile() {
+      REPO_FILES[currentEditingFile] = document.getElementById("jsCodeEditor").value;
+      navigator.clipboard.writeText(REPO_FILES[currentEditingFile]).then(() => {
+        showToast(`${currentEditingFile} copiado para tu repo de GitHub`);
+      });
+    }
+
+    // =========================================================================
+    // MOTOR EJECUTOR DE SCRIPTS JS EN EL CANVAS 240x280
+    // =========================================================================
+    function renderJsScriptScreen(scriptPath) {
+      const theme = THEMES[state.themeKey];
+      ctx.fillStyle = TFT_COLORS.BLACK;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const src = REPO_FILES[scriptPath];
+      if (!src) {
+        renderStatusBar("SCRIPT JS");
+        drawRoundRect(12, 40, 216, 150, 8, true, true, theme.cardBg, theme.cardBorder);
+        drawTFTText(`Archivo: /${scriptPath}`, 22, 65, 1, theme.accent);
+        drawTFTText("Listo para descargar de GitHub", 22, 95, 1, TFT_COLORS.GREEN);
+        drawTFTText("Pulsa OK para volver", 50, 230, 1, TFT_COLORS.WHITE);
+        return;
+      }
+
+      // API tft expuesta al script JS (igual que en el intérprete C++ del ESP32)
+      const tftApi = {
+        clear: (col = "#000000") => {
+          ctx.fillStyle = col;
+          ctx.fillRect(0, 0, 240, 280);
+        },
+        statusBar: (title) => {
+          renderStatusBar(String(title));
+        },
+        card: (x, y, w, h) => {
+          drawRoundRect(x, y, w, h, 6, true, true, theme.cardBg, theme.cardBorder);
+        },
+        rect: (x, y, w, h, col = theme.accent) => {
+          drawRoundRect(x, y, w, h, 6, true, true, theme.accentBg, col);
+        },
+        circle: (x, y, r, col = theme.accent) => {
+          ctx.strokeStyle = col;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(x, y, r, 0, Math.PI * 2);
+          ctx.stroke();
+        },
+        text: (str, x, y, sz = 1, col = "#FFFFFF") => {
+          drawTFTText(String(str), x, y, sz, col);
+        },
+        oscilloscope: (ox, oy, ow, oh, col = "#00E676") => {
+          ctx.strokeStyle = "#17231c";
+          ctx.lineWidth = 1;
+          for (let gx = ox; gx <= ox + ow; gx += 25) {
+            ctx.beginPath(); ctx.moveTo(gx, oy); ctx.lineTo(gx, oy + oh); ctx.stroke();
+          }
+          for (let gy = oy; gy <= oy + oh; gy += 25) {
+            ctx.beginPath(); ctx.moveTo(ox, gy); ctx.lineTo(ox + ow, gy); ctx.stroke();
+          }
+          ctx.strokeStyle = col;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          const step = ow / state.monitorWaveData.length;
+          for (let i = 0; i < state.monitorWaveData.length; i++) {
+            const px = ox + (i * step);
+            const py = state.monitorWaveData[i];
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+          }
+          ctx.stroke();
+        }
+      };
+
+      try {
+        const runner = new Function("tft", "system", src + "\nif (typeof render === 'function') render(tft, system);");
+        runner(tftApi, { theme, wifiConnected: state.wifiConnected });
+      } catch (err) {
+        renderStatusBar("ERROR EN JS");
+        drawTFTText("Error de sintaxis en script:", 12, 50, 1, TFT_COLORS.RED);
+        drawTFTText(String(err.message).slice(0, 32), 12, 75, 1, TFT_COLORS.WHITE);
+      }
+    }
+
+    function updateWifiScanList() {
+      const list = [];
+      if (state.hasSavedWifi && state.savedWifiSSID) {
+        list.push({ ssid: `⚡ Conectar a "${state.savedWifiSSID}"`, isSavedConnect: true, rssi: -48 });
+      }
+      list.push(
+        { ssid: "Mi_Casa_5G", rssi: -52, lock: true },
+        { ssid: "Oficina_Tech", rssi: -65, lock: true },
+        { ssid: "g4briel_Hotspot", rssi: -71, lock: false }
+      );
+      if (state.hasSavedWifi) {
+        list.push({ ssid: "🗑️ Olvidar Red Guardada", isForget: true, rssi: 0 });
+      }
+      list.push({ ssid: "◀ Volver", rssi: 0, isBack: true });
+      state.wifiScanList = list;
+    }
+
+    let isBooting = false;
+    let bootAnimationTimer = null;
+    let cursorBlink = true;
+    setInterval(() => {
+      cursorBlink = !cursorBlink;
+      if (state.currentScreen === 'WIFI_KEYBOARD') renderScreen();
+    }, 500);
+
+    // =========================================================================
+    // ANIMACIÓN DE INICIO (EJECUTA LA LÓGICA DE apps/boot.js)
+    // =========================================================================
+    function triggerBootAnimation() {
+      applyAllRepoFilesToState();
+      if (isBooting) return;
+      isBooting = true;
+      let progress = 0;
+      let pulseAngle = 0;
+      const theme = THEMES[state.themeKey];
+      const w = 240, h = 280;
+      const bootSteps = state.bootSteps;
+
+      if (bootAnimationTimer) clearInterval(bootAnimationTimer);
+
+      bootAnimationTimer = setInterval(() => {
+        progress += 3.2;
+        pulseAngle += 0.22;
+
+        ctx.fillStyle = TFT_COLORS.BLACK;
+        ctx.fillRect(0, 0, w, h);
+
+        const ringR = 26 + Math.sin(pulseAngle) * 5;
+        ctx.strokeStyle = theme.cardBorder;
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.arc(120, 85, ringR + 8, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.strokeStyle = theme.accent;
+        ctx.beginPath();
+        ctx.arc(120, 85, ringR, 0, Math.PI * 2);
+        ctx.stroke();
+
+        drawRoundRect(106, 71, 28, 28, 6, true, true, theme.accentBg, theme.accent);
+        ctx.fillStyle = theme.accent;
+        ctx.fillRect(116, 81, 8, 8);
+
+        const logoX = Math.max(12, Math.floor((w - (state.bootLogoText.length * 10)) / 2));
+        drawTFTText(state.bootLogoText, logoX, 130, 2, TFT_COLORS.WHITE);
+        const subX = Math.max(12, Math.floor((w - (state.bootSubText.length * 6.5)) / 2));
+        drawTFTText(state.bootSubText, subX, 154, 1, theme.textSecondary);
+
+        const barX = 30, barY = 195, barW = 180, barH = 8;
+        drawRoundRect(barX, barY, barW, barH, 4, false, true, null, theme.cardBorder);
+        const fillW = Math.max(0, Math.floor((barW - 4) * (Math.min(100, progress) / 100)));
+        if (fillW > 0) {
+          drawRoundRect(barX + 2, barY + 2, fillW, barH - 4, 2, true, false, theme.accent, null);
+        }
+
+        const stepIdx = Math.min(bootSteps.length - 1, Math.floor((progress / 100) * bootSteps.length));
+        const statusMsg = bootSteps[stepIdx] || "";
+        const msgX = Math.max(10, Math.floor((w - (statusMsg.length * 6.2)) / 2));
+        drawTFTText(statusMsg, msgX, 215, 1, theme.accent);
+
+        if (progress >= 100) {
+          clearInterval(bootAnimationTimer);
+          setTimeout(() => {
+            isBooting = false;
+            if (state.hasSavedWifi) state.wifiConnected = true;
+            state.currentScreen = 'MAIN_MENU';
+            state.opcionActual = 0;
+            state.scrollOffset = 0;
+            renderScreen();
+          }, 300);
+        }
+      }, 35);
+    }
+
+    let githubSyncTimer = null;
+    function startGithubSyncScreen() {
+      if (isBooting) return;
+      REPO_FILES[currentEditingFile] = document.getElementById("jsCodeEditor").value;
+      applyAllRepoFilesToState();
+      generateArduinoCode();
+
+      state.currentScreen = 'GITHUB_SYNC';
+      state.githubSyncProgress = 0;
+      const filesToSync = Object.keys(REPO_FILES);
+
+      if (githubSyncTimer) clearInterval(githubSyncTimer);
+      githubSyncTimer = setInterval(() => {
+        state.githubSyncProgress += 4;
+        const fileIdx = Math.min(filesToSync.length - 1, Math.floor((state.githubSyncProgress / 100) * filesToSync.length));
+        state.githubSyncFile = filesToSync[fileIdx] || "manifest.json";
+        renderScreen();
+
+        if (state.githubSyncProgress >= 100) {
+          clearInterval(githubSyncTimer);
+          setTimeout(() => {
+            showToast("¡Scripts .js sincronizados y guardados en LittleFS!");
+            state.currentScreen = 'MAIN_MENU';
+            state.opcionActual = 0;
+            state.scrollOffset = 0;
+            renderScreen();
+          }, 500);
+        }
+      }, 60);
+    }
+
+    function renderGithubSyncScreen() {
+      const theme = THEMES[state.themeKey];
+      ctx.fillStyle = TFT_COLORS.BLACK;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      renderStatusBar("GITHUB OTA SYNC");
+
+      drawRoundRect(12, 32, 216, 54, 6, true, true, theme.cardBg, theme.cardBorder);
+      drawTFTText("Repositorio GitHub:", 20, 38, 1, theme.textSecondary);
+      const shortRepo = state.githubRepoUrl.replace("https://raw.githubusercontent.com/", "");
+      drawTFTText(shortRepo.slice(0, 28), 20, 52, 1, theme.accent);
+      drawTFTText("Destino: LittleFS (Flash ESP32)", 20, 68, 1, TFT_COLORS.GREEN);
+
+      drawRoundRect(12, 96, 216, 110, 8, true, true, "#0b0e14", theme.cardBorder);
+      drawTFTText("Descargando archivo JS/JSON:", 22, 108, 1, theme.textSecondary);
+      drawTFTText(`GET /${state.githubSyncFile}`, 22, 126, 2, TFT_COLORS.WHITE);
+
+      const barX = 22, barY = 156, barW = 196, barH = 12;
+      drawRoundRect(barX, barY, barW, barH, 4, false, true, null, theme.cardBorder);
+      const fillW = Math.max(0, Math.floor((barW - 4) * (Math.min(100, state.githubSyncProgress) / 100)));
+      if (fillW > 0) {
+        drawRoundRect(barX + 2, barY + 2, fillW, barH - 4, 2, true, false, theme.accent, null);
+      }
+
+      drawTFTText(`${Math.min(100, state.githubSyncProgress)}% completado`, 75, 178, 1, theme.accent);
+      drawTFTText("Actualizando orden de menús...", 28, 224, 1, theme.textSecondary);
+      drawTFTText("Sin necesidad de cable USB", 38, 242, 1, TFT_COLORS.GREEN);
+    }
+
+    function startWifiFromButton() {
+      updateWifiScanList();
+      state.currentScreen = 'WIFI_SCAN';
+      state.wifiScanIndex = 0;
+      renderScreen();
+    }
+
+    function drawWifiIcon(x, y, color) {
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.arc(x + 7, y + 12, 8.5, Math.PI * 1.25, Math.PI * 1.75);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(x + 7, y + 12, 5.2, Math.PI * 1.25, Math.PI * 1.75);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(x + 7, y + 11.8, 1.6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    function drawPixelIcon(type, x, y, size, color) {
+      ctx.fillStyle = color;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.5;
+      switch(type) {
+        case "🩺":
+          ctx.fillRect(x + 4, y + 1, 4, 10);
+          ctx.fillRect(x + 1, y + 4, 10, 4);
+          break;
+        case "⚙️":
+          ctx.beginPath(); ctx.arc(x + 6, y + 6, 4, 0, Math.PI * 2); ctx.stroke();
+          ctx.fillRect(x + 5, y + 1, 2, 10);
+          ctx.fillRect(x + 1, y + 5, 10, 2);
+          break;
+        case "📐":
+          ctx.beginPath(); ctx.moveTo(x + 1, y + 11); ctx.lineTo(x + 11, y + 11); ctx.lineTo(x + 1, y + 1); ctx.closePath(); ctx.stroke();
+          break;
+        case "🎨":
+          ctx.beginPath(); ctx.arc(x + 6, y + 6, 5, 0, Math.PI * 2); ctx.stroke();
+          ctx.fillRect(x + 4, y + 4, 4, 4);
+          break;
+        case "📊":
+          ctx.fillRect(x + 1, y + 7, 2, 5);
+          ctx.fillRect(x + 5, y + 4, 2, 8);
+          ctx.fillRect(x + 9, y + 1, 2, 11);
+          break;
+        case "📶":
+          drawWifiIcon(x - 1, y - 2, color);
+          break;
+        case "💡":
+          ctx.beginPath(); ctx.arc(x + 6, y + 5, 3.5, 0, Math.PI * 2); ctx.fill();
+          ctx.fillRect(x + 5, y + 9, 2, 2);
+          break;
+        case "↩️":
+          ctx.beginPath(); ctx.moveTo(x + 2, y + 6); ctx.lineTo(x + 6, y + 2); ctx.lineTo(x + 6, y + 5); ctx.lineTo(x + 11, y + 5); ctx.lineTo(x + 11, y + 7); ctx.lineTo(x + 6, y + 7); ctx.lineTo(x + 6, y + 10); ctx.closePath(); ctx.fill();
+          break;
+        case "🔄":
+          ctx.beginPath(); ctx.arc(x + 6, y + 6, 4.5, 0.3, Math.PI * 1.7); ctx.stroke();
+          ctx.fillRect(x + 8, y + 1, 3, 3);
+          break;
+        case "⚡":
+          ctx.beginPath();
+          ctx.moveTo(x + 7, y + 1); ctx.lineTo(x + 2, y + 6); ctx.lineTo(x + 6, y + 6);
+          ctx.lineTo(x + 4, y + 11); ctx.lineTo(x + 10, y + 5); ctx.lineTo(x + 6, y + 5);
+          ctx.closePath(); ctx.fill();
+          break;
+        case "💧":
+          ctx.beginPath();
+          ctx.moveTo(x + 6, y + 1);
+          ctx.quadraticCurveTo(x + 11, y + 6, x + 6, y + 11);
+          ctx.quadraticCurveTo(x + 1, y + 6, x + 6, y + 1);
+          ctx.fill();
+          break;
+        case "🔥":
+          ctx.beginPath();
+          ctx.moveTo(x + 6, y + 1); ctx.lineTo(x + 10, y + 6); ctx.lineTo(x + 8, y + 11);
+          ctx.lineTo(x + 4, y + 11); ctx.lineTo(x + 2, y + 6); ctx.closePath(); ctx.fill();
+          break;
+        case "🎮":
+        case "🕹️":
+          ctx.strokeRect(x + 1, y + 2, 10, 8);
+          ctx.fillRect(x + 3, y + 5, 3, 1);
+          ctx.fillRect(x + 4, y + 4, 1, 3);
+          ctx.fillRect(x + 8, y + 5, 2, 2);
+          break;
+        default:
+          ctx.fillRect(x + 2, y + 2, 8, 8);
+          break;
+      }
+    }
+
+    function drawRoundRect(x, y, w, h, r, fill, stroke, fillColor, strokeColor) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      ctx.lineTo(x + r, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+      if (fill) { ctx.fillStyle = fillColor; ctx.fill(); }
+      if (stroke) { ctx.lineWidth = 1.3; ctx.strokeStyle = strokeColor; ctx.stroke(); }
+    }
+
+    function drawTFTText(text, x, y, size, color) {
+      ctx.fillStyle = color;
+      let px = 11;
+      if (size === 1) px = 10;
+      if (size === 2) px = 13;
+      if (size === 3) px = 18;
+      ctx.font = `bold ${px}px "Consolas", "Courier New", monospace`;
+      ctx.textBaseline = "top";
+      ctx.fillText(text, x, y);
+    }
+
+    function renderStatusBar(titleText) {
+      const theme = THEMES[state.themeKey];
+      const h = 24;
+      const w = canvas.width;
+
+      ctx.fillStyle = theme.topBarBg;
+      ctx.fillRect(0, 0, w, h);
+      ctx.fillStyle = theme.cardBorder;
+      ctx.fillRect(0, h - 1, w, 1);
+
+      drawTFTText(titleText, 8, 5, 1, theme.accent);
+
+      const wx = w - 50;
+      drawWifiIcon(wx, 3, state.wifiConnected ? TFT_COLORS.GREEN : theme.accent);
+
+      const bx = w - 28;
+      ctx.strokeStyle = TFT_COLORS.GREY;
+      ctx.strokeRect(bx, 7, 18, 9);
+      ctx.fillStyle = TFT_COLORS.GREY;
+      ctx.fillRect(bx + 18, 9, 2, 5);
+      ctx.fillStyle = TFT_COLORS.GREEN;
+      const fillW = Math.max(2, Math.floor(14 * (state.batteryLevel / 100)));
+      ctx.fillRect(bx + 2, 9, fillW, 5);
+
+      return h;
+    }
+
+    function getCurrentList() {
+      if (state.currentScreen === 'MAIN_MENU') return state.mainMenuItems;
+      if (state.currentScreen === 'SUB_DIAG') return state.diagMenuItems;
+      if (state.currentScreen === 'SUB_SYS') return state.sysMenuItems;
+      if (state.currentScreen === 'SUB_CONFIG') return state.configMenuItems;
+      return [];
+    }
+
+    function renderScreen() {
+      if (isBooting) return;
+
+      const w = 240, h = 280;
+      canvas.width = w;
+      canvas.height = h;
+
+      if (state.currentScreen === 'GITHUB_SYNC') { renderGithubSyncScreen(); return; }
+      if (state.currentScreen === 'WIFI_SCAN') { renderWifiScanScreen(); return; }
+      if (state.currentScreen === 'WIFI_KEYBOARD') { renderWifiKeyboardScreen(); return; }
+      if (state.currentScreen === 'WIFI_CONNECTING') { renderWifiConnectingScreen(); return; }
+      if (state.currentScreen === 'WIFI_SUCCESS') { renderWifiSuccessScreen(); return; }
+      if (state.currentScreen === 'RGB_TEST') { renderRGBTestScreen(); return; }
+      if (state.currentScreen === 'BTN_TEST') { renderBtnTestScreen(); return; }
+      if (state.currentScreen === 'MEM_INFO') { renderMemInfoScreen(); return; }
+      if (state.currentScreen === 'GAMEBOY_SCREEN') { renderGameBoyScreen(); return; }
+      if (state.currentScreen === 'SUB_MONITOR') { renderJsScriptScreen("apps/monitor.js"); return; }
+      if (state.currentScreen === 'JS_SCRIPT_VIEW') { renderJsScriptScreen(state.activeScriptPath); return; }
+
+      ctx.fillStyle = TFT_COLORS.BLACK;
+      ctx.fillRect(0, 0, w, h);
+
+      let screenTitle = state.menuTitle;
+      if (state.currentScreen === 'SUB_DIAG') screenTitle = "G4BRIEL • GAMEBOY";
+      if (state.currentScreen === 'SUB_SYS') screenTitle = "SISTEMA & TESTS";
+      if (state.currentScreen === 'SUB_CONFIG') screenTitle = "CONFIGURACION";
+      const topOffset = renderStatusBar(screenTitle);
+
+      const items = getCurrentList();
+      const total = items.length;
+      const visibleCount = state.layoutMode === 'smart_list' ? 5 : 3;
+
+      if (state.opcionActual < state.scrollOffset) {
+        state.scrollOffset = state.opcionActual;
+      } else if (state.opcionActual >= state.scrollOffset + visibleCount) {
+        state.scrollOffset = state.opcionActual - visibleCount + 1;
+      }
+
+      if (state.layoutMode === 'smart_list') {
+        renderSmartList(items, topOffset, visibleCount);
+      } else {
+        renderFocusCard(items, topOffset);
+      }
+
+      if (total > visibleCount) {
+        renderScrollbar(topOffset, h - topOffset, total, visibleCount);
+      }
+    }
+
+    function renderSmartList(items, topOffset, visibleCount) {
+      const theme = THEMES[state.themeKey];
+      const rowH = state.rowH;
+      const spacing = state.spacing;
+      const startY = topOffset + 7;
+      const itemW = state.itemW;
+      const itemX = Math.floor((240 - itemW) / 2) - 2;
+
+      for (let i = 0; i < visibleCount; i++) {
+        const itemIdx = state.scrollOffset + i;
+        if (itemIdx >= items.length) break;
+
+        const item = items[itemIdx];
+        const isSelected = (itemIdx === state.opcionActual);
+        const y = startY + (i * (rowH + spacing));
+        const itemAccent = item.color || theme.accent;
+
+        if (isSelected) {
+          drawRoundRect(itemX, y, itemW, rowH, 6, true, true, theme.accentBg, itemAccent);
+          ctx.fillStyle = itemAccent;
+          ctx.fillRect(itemX + 2, y + 6, 3, rowH - 12);
+        } else {
+          drawRoundRect(itemX, y, itemW, rowH, 6, true, true, theme.cardBg, item.color ? item.color : theme.cardBorder);
+        }
+
+        const iconColor = isSelected ? itemAccent : (item.color || theme.textSecondary);
+        drawPixelIcon(item.icon, itemX + 11, y + Math.floor((rowH - 12) / 2), 12, iconColor);
+
+        const titleColor = isSelected ? theme.textPrimary : (item.color || theme.textSecondary);
+        drawTFTText(item.title, itemX + 30, y + Math.floor((rowH - 14) / 2), 2, titleColor);
+
+        if (item.isWifiBtn) {
+          const wStatus = state.wifiConnected ? "ON" : (state.hasSavedWifi ? "NVS✔" : "CFG");
+          drawTFTText(`[${wStatus}]`, itemX + itemW - (wStatus.length * 6.5) - 12, y + Math.floor((rowH - 12) / 2), 1, state.wifiConnected ? TFT_COLORS.GREEN : theme.accent);
+        } else if (item.isGithubBtn) {
+          drawTFTText("[OTA]", itemX + itemW - 42, y + Math.floor((rowH - 12) / 2), 1, theme.accent);
+        } else if (item.isModeToggle) {
+          const modeLabel = state.layoutMode === 'smart_list' ? "[Slim]" : "[Focus]";
+          drawTFTText(modeLabel, itemX + itemW - 52, y + Math.floor((rowH - 12) / 2), 1, theme.accent);
+        } else if (item.isThemeToggle) {
+          const themeName = THEMES[state.themeKey].name;
+          drawTFTText(`[${themeName}]`, itemX + itemW - 62, y + Math.floor((rowH - 12) / 2), 1, theme.accent);
+        } else if (item.isSlider) {
+          const barW = 46;
+          ctx.strokeStyle = theme.cardBorder;
+          ctx.strokeRect(itemX + itemW - 58, y + Math.floor((rowH - 10) / 2), barW, 10);
+          ctx.fillStyle = theme.accent;
+          ctx.fillRect(itemX + itemW - 56, y + Math.floor((rowH - 10) / 2) + 2, (barW - 4) * (state.brightnessValue / 100), 6);
+        } else {
+          drawTFTText("›", itemX + itemW - 14, y + Math.floor((rowH - 14) / 2), 2, isSelected ? itemAccent : theme.cardBorder);
+        }
+      }
+    }
+
+    function renderFocusCard(items, topOffset) {
+      const theme = THEMES[state.themeKey];
+      const cur = items[state.opcionActual];
+      const prev = items[(state.opcionActual - 1 + items.length) % items.length];
+      const next = items[(state.opcionActual + 1) % items.length];
+      const curAccent = cur.color || theme.accent;
+
+      ctx.globalAlpha = 0.35;
+      drawRoundRect(18, topOffset + 8, 204, 32, 6, true, true, theme.cardBg, theme.cardBorder);
+      drawPixelIcon(prev.icon, 28, topOffset + 18, 12, theme.textSecondary);
+      drawTFTText(prev.title, 48, topOffset + 18, 1, theme.textSecondary);
+      ctx.globalAlpha = 1.0;
+
+      const centerY = topOffset + 48;
+      drawRoundRect(14, centerY, 212, 100, 10, true, true, theme.accentBg, curAccent);
+      drawPixelIcon(cur.icon, 26, centerY + 18, 18, curAccent);
+      drawTFTText(cur.title, 55, centerY + 16, 2, cur.color || theme.textPrimary);
+
+      let subDesc = cur.sub || (cur.script ? `Script: /${cur.script}` : "");
+      if (cur.isModeToggle) subDesc = "Modo: " + (state.layoutMode === 'smart_list' ? "Lista Slim" : "Focus Smartwatch");
+      else if (cur.isThemeToggle) subDesc = "Tema: " + THEMES[state.themeKey].name;
+      if (subDesc) drawTFTText(subDesc, 26, centerY + 46, 1, theme.textSecondary);
+
+      drawTFTText(`[${state.opcionActual + 1}/${items.length}]`, 170, centerY + 78, 1, curAccent);
+
+      ctx.globalAlpha = 0.35;
+      drawRoundRect(18, centerY + 108, 204, 32, 6, true, true, theme.cardBg, theme.cardBorder);
+      drawPixelIcon(next.icon, 28, centerY + 118, 12, theme.textSecondary);
+      drawTFTText(next.title, 48, centerY + 118, 1, theme.textSecondary);
+      ctx.globalAlpha = 1.0;
+    }
+
+    function renderScrollbar(topY, totalH, totalItems, visibleItems) {
+      const theme = THEMES[state.themeKey];
+      const sbX = 233;
+      const trackH = totalH - 16;
+      const y = topY + 8;
+      ctx.fillStyle = theme.cardBg;
+      ctx.fillRect(sbX, y, 3, trackH);
+
+      const thumbH = Math.max(14, Math.floor((visibleItems / totalItems) * trackH));
+      const maxScroll = totalItems - visibleItems;
+      const scrollRatio = maxScroll > 0 ? (state.scrollOffset / maxScroll) : 0;
+      const thumbY = y + Math.floor((trackH - thumbH) * scrollRatio);
+
+      ctx.fillStyle = theme.accent;
+      ctx.fillRect(sbX, thumbY, 3, thumbH);
+    }
+
+    function renderWifiScanScreen() {
+      const theme = THEMES[state.themeKey];
+      ctx.fillStyle = TFT_COLORS.BLACK;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      renderStatusBar("REDES WIFI (NVS)");
+      drawTFTText("Selecciona una red:", 14, 28, 1, theme.textSecondary);
+
+      const startY = 44, rowH = 32, spacing = 4;
+      state.wifiScanList.forEach((net, idx) => {
+        const y = startY + (idx * (rowH + spacing));
+        const isSel = (idx === state.wifiScanIndex);
+        if (isSel) {
+          drawRoundRect(10, y, 220, rowH, 6, true, true, theme.accentBg, theme.accentBorder);
+          ctx.fillStyle = theme.accent;
+          ctx.fillRect(12, y + 4, 3, rowH - 8);
+        } else {
+          drawRoundRect(10, y, 220, rowH, 6, true, true, theme.cardBg, theme.cardBorder);
+        }
+
+        if (net.isSavedConnect) {
+          drawTFTText(net.ssid, 20, y + 9, 1, isSel ? TFT_COLORS.GREEN : theme.accent);
+        } else if (net.isForget) {
+          drawTFTText(net.ssid, 20, y + 9, 1, isSel ? TFT_COLORS.RED : theme.textSecondary);
+        } else if (net.isBack) {
+          drawTFTText(net.ssid, 20, y + 9, 1, isSel ? theme.accent : theme.textSecondary);
+        } else {
+          drawWifiIcon(16, y + 3, isSel ? theme.accent : theme.textSecondary);
+          drawTFTText(net.ssid, 38, y + 8, 2, TFT_COLORS.WHITE);
+        }
+      });
+    }
+
+    function renderWifiKeyboardScreen() {
+      const theme = THEMES[state.themeKey];
+      ctx.fillStyle = TFT_COLORS.BLACK;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      renderStatusBar("ESCRIBIR CLAVE WIFI");
+
+      // Caja de contraseña con recorte (clip) y ajuste inteligente para claves largas
+      drawRoundRect(8, 28, 224, 58, 6, true, true, theme.cardBg, theme.cardBorder);
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(10, 29, 220, 56);
+      ctx.clip();
+
+      const shortSsid = state.wifiSelectedSSID.length > 16
+        ? state.wifiSelectedSSID.slice(0, 15) + "…"
+        : state.wifiSelectedSSID;
+      drawTFTText(`Red: ${shortSsid}`, 14, 32, 1, theme.accent);
+      drawTFTText(`${state.wifiPassword.length} car.`, 182, 32, 1, theme.textSecondary);
+
+      const maskedPass = state.wifiShowPass ? state.wifiPassword : '•'.repeat(state.wifiPassword.length);
+      const cursorChar = cursorBlink ? "_" : " ";
+
+      if (maskedPass.length <= 12) {
+        drawTFTText(`Clave: ${maskedPass}${cursorChar}`, 14, 50, 2, TFT_COLORS.WHITE);
+      } else {
+        // Si la clave es larga (>12 caracteres), la dividimos en 2 líneas dentro del recuadro
+        // y si pasa de 50 caracteres hace auto-scroll mostrando siempre el final
+        let visiblePass = maskedPass;
+        let prefix = "";
+        if (visiblePass.length > 48) {
+          visiblePass = visiblePass.slice(visiblePass.length - 48);
+          prefix = "«";
+        }
+        const fullStr = `${prefix}${visiblePass}${cursorChar}`;
+        const line1 = fullStr.slice(0, 26);
+        const line2 = fullStr.slice(26, 52);
+        drawTFTText(line1, 14, 48, 1, TFT_COLORS.WHITE);
+        if (line2) {
+          drawTFTText(line2, 14, 64, 1, TFT_COLORS.GREEN);
+        }
+      }
+      ctx.restore();
+
+      const drumY = 92;
+      drawRoundRect(8, drumY, 224, 78, 8, true, true, "#0b0e14", theme.cardBorder);
+      drawTFTText("▲ ANTERIOR (✔ / ⌫)", 64, drumY + 5, 1, theme.textSecondary);
+
+      const totalKeys = KB_KEYS.length;
+      for (let offset = -2; offset <= 2; offset++) {
+        const idx = (state.keyboardIndex + offset + totalKeys) % totalKeys;
+        const keyVal = KB_KEYS[idx];
+        const kx = 120 + (offset * 40) - 16;
+        const ky = drumY + 23;
+        if (offset === 0) {
+          const isOkKey = (keyVal === '✔');
+          const boxBg = isOkKey ? "#003818" : theme.accentBg;
+          const boxBorder = isOkKey ? TFT_COLORS.GREEN : theme.accentBorder;
+          drawRoundRect(kx - 6, ky - 3, 44, 36, 6, true, true, boxBg, boxBorder);
+          if (keyVal === '␣') {
+            drawTFTText("ESP", kx + 2, ky + 10, 2, TFT_COLORS.WHITE);
+          } else if (keyVal === '✔') {
+            drawTFTText("OK!", kx + 2, ky + 10, 2, TFT_COLORS.GREEN);
+          } else if (keyVal === '⌫') {
+            drawTFTText("BOR", kx + 1, ky + 10, 2, TFT_COLORS.WHITE);
+          } else {
+            drawTFTText(keyVal, kx + 8, ky + 8, 3, TFT_COLORS.WHITE);
+          }
+        } else {
+          ctx.globalAlpha = Math.abs(offset) === 1 ? 0.6 : 0.25;
+          drawRoundRect(kx, ky, 32, 30, 4, true, true, theme.cardBg, theme.cardBorder);
+          drawTFTText(keyVal === '✔' ? "OK" : keyVal, kx + (keyVal === '✔' ? 4 : 8), ky + 7, 2, keyVal === '✔' ? TFT_COLORS.GREEN : theme.textSecondary);
+          ctx.globalAlpha = 1.0;
+        }
+      }
+      drawTFTText("▼ SIGUIENTE LETRA", 66, drumY + 61, 1, theme.textSecondary);
+
+      const actY = 178;
+      const curKeyName = KB_KEYS[state.keyboardIndex];
+      drawRoundRect(8, actY, 68, 34, 6, true, true, curKeyName==='⌫' ? theme.accentBg : theme.cardBg, curKeyName==='⌫' ? theme.accent : theme.cardBorder);
+      drawTFTText("⌫ Borrar", 12, actY + 11, 1, TFT_COLORS.WHITE);
+
+      drawRoundRect(82, actY, 76, 34, 6, true, true, curKeyName==='✔' ? "#003818" : theme.cardBg, curKeyName==='✔' ? TFT_COLORS.GREEN : theme.cardBorder);
+      drawTFTText("✔ Conectar", 86, actY + 11, 1, TFT_COLORS.GREEN);
+
+      drawRoundRect(164, actY, 68, 34, 6, true, true, curKeyName==='◀' ? theme.accentBg : theme.cardBg, curKeyName==='◀' ? theme.accent : theme.cardBorder);
+      drawTFTText("◀ Volver", 170, actY + 11, 1, TFT_COLORS.WHITE);
+
+      drawTFTText("Para Conectar: Elige [OK!] con ▲/▼ y", 12, 224, 1, TFT_COLORS.WHITE);
+      drawTFTText("pulsa ● OK (o mantén ● OK 0.6 seg)", 12, 240, 1, TFT_COLORS.GREEN);
+      drawTFTText("También puedes tocar [✔ Conectar]", 16, 256, 1, theme.textSecondary);
+    }
+
+    let connectingPulse = 0;
+    let connectingTimer = null;
+    function renderWifiConnectingScreen() {
+      const theme = THEMES[state.themeKey];
+      ctx.fillStyle = TFT_COLORS.BLACK;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      renderStatusBar("CONECTANDO...");
+      connectingPulse += 0.25;
+      const waveR = 25 + Math.sin(connectingPulse) * 8;
+      ctx.strokeStyle = theme.accent;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(120, 95, waveR, Math.PI * 1.25, Math.PI * 1.75);
+      ctx.stroke();
+      drawWifiIcon(113, 85, theme.accent);
+      drawTFTText("Guardando en Flash NVS...", 40, 165, 1, theme.accent);
+    }
+
+    function startWifiConnection() {
+      state.currentScreen = 'WIFI_CONNECTING';
+      renderScreen();
+      if (connectingTimer) clearInterval(connectingTimer);
+      connectingTimer = setInterval(() => {
+        if (state.currentScreen === 'WIFI_CONNECTING') renderScreen();
+      }, 50);
+
+      setTimeout(() => {
+        clearInterval(connectingTimer);
+        state.wifiConnected = true;
+        state.savedWifiSSID = state.wifiSelectedSSID;
+        state.savedWifiPass = state.wifiPassword;
+        state.hasSavedWifi = true;
+        localStorage.setItem("g4briel_wifi_ssid", state.wifiSelectedSSID);
+        localStorage.setItem("g4briel_wifi_pass", state.wifiPassword);
+        updateWifiScanList();
+        state.currentScreen = 'WIFI_SUCCESS';
+        renderScreen();
+        generateArduinoCode();
+      }, 1400);
+    }
+
+    function renderWifiSuccessScreen() {
+      const theme = THEMES[state.themeKey];
+      ctx.fillStyle = TFT_COLORS.BLACK;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      renderStatusBar("WIFI CONECTADO");
+      drawTFTText("CONEXION EXITOSA", 48, 55, 2, TFT_COLORS.GREEN);
+      drawRoundRect(12, 85, 216, 115, 8, true, true, theme.cardBg, theme.cardBorder);
+      drawTFTText(`SSID: ${state.wifiSelectedSSID}`, 22, 100, 1, TFT_COLORS.WHITE);
+      drawTFTText(`IP: ${state.wifiIP}`, 22, 122, 1, theme.accent);
+      drawTFTText("NVS: Guardada Permanentemente ✔", 22, 144, 1, TFT_COLORS.GREEN);
+      drawTFTText("Listo para descargar de GitHub", 22, 166, 1, theme.textSecondary);
+      drawRoundRect(20, 224, 200, 36, 6, true, true, theme.accentBg, theme.accentBorder);
+      drawTFTText("● OK: Volver al Menú", 46, 236, 1, TFT_COLORS.WHITE);
+    }
+
+    function renderRGBTestScreen() {
+      const colors = ["#FF0000", "#00FF00", "#0000FF", "#FFFFFF", "#000000"];
+      const names = ["ROJO", "VERDE", "AZUL", "BLANCO", "NEGRO"];
+      const col = colors[state.rgbTestStep % colors.length];
+      ctx.fillStyle = col;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      const txtCol = (col === "#FFFFFF") ? "#000000" : "#FFFFFF";
+      drawTFTText(`TEST RGB: ${names[state.rgbTestStep % names.length]}`, 20, 40, 2, txtCol);
+      drawTFTText("OK: Cambiar color | UP/DOWN: Salir", 18, 80, 1, txtCol);
+    }
+
+    function renderBtnTestScreen() {
+      const theme = THEMES[state.themeKey];
+      ctx.fillStyle = TFT_COLORS.BLACK;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      renderStatusBar("TEST 3 BOTONES");
+      const isUp = (state.lastBtnPressed === "UP");
+      drawRoundRect(20, 60, 200, 38, 6, true, true, isUp ? theme.accent : theme.cardBg, theme.cardBorder);
+      drawTFTText("▲ PIN 25 (UP)", 35, 72, 2, isUp ? TFT_COLORS.BLACK : TFT_COLORS.WHITE);
+
+      const isOk = (state.lastBtnPressed === "OK");
+      drawRoundRect(20, 112, 200, 38, 6, true, true, isOk ? theme.accent : theme.cardBg, theme.cardBorder);
+      drawTFTText("● PIN 27 (OK)", 35, 124, 2, isOk ? TFT_COLORS.BLACK : TFT_COLORS.WHITE);
+
+      const isDown = (state.lastBtnPressed === "DOWN");
+      drawRoundRect(20, 164, 200, 38, 6, true, true, isDown ? theme.accent : theme.cardBg, theme.cardBorder);
+      drawTFTText("▼ PIN 26 (DOWN)", 35, 176, 2, isDown ? TFT_COLORS.BLACK : TFT_COLORS.WHITE);
+
+      drawTFTText("Pulsa 2 veces OK para volver", 32, 226, 1, theme.textSecondary);
+    }
+
+    function renderMemInfoScreen() {
+      const theme = THEMES[state.themeKey];
+      ctx.fillStyle = TFT_COLORS.BLACK;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      renderStatusBar("MEMORIA & SCRIPTS");
+
+      drawRoundRect(12, 34, 216, 174, 8, true, true, theme.cardBg, theme.cardBorder);
+      drawTFTText("ESP32-WROOM (38 Pines)", 22, 46, 2, TFT_COLORS.WHITE);
+      drawTFTText("Flash LittleFS: 1.5 MB Libres", 22, 74, 1, TFT_COLORS.GREEN);
+      drawTFTText("SRAM Interna: 318 KB Libres", 22, 94, 1, theme.accent);
+      drawTFTText(`Scripts JS cargados: ${Object.keys(REPO_FILES).length}`, 22, 114, 1, TFT_COLORS.CYAN);
+      drawTFTText(`WiFi NVS: ${state.hasSavedWifi ? state.savedWifiSSID : 'Sin guardar'}`, 22, 134, 1, TFT_COLORS.WHITE);
+      drawTFTText("Display: ST7789 240x280 IPS", 22, 154, 1, theme.textSecondary);
+      drawTFTText("Pruebas movidas de g4briel ✔", 22, 174, 1, TFT_COLORS.GREEN);
+
+      drawRoundRect(20, 224, 200, 36, 6, true, true, theme.accentBg, theme.accentBorder);
+      drawTFTText("● OK: Volver a Sistema", 44, 236, 1, TFT_COLORS.WHITE);
+    }
+
+    // =========================================================================
+    // PANTALLA GAMEBOY COLOR - POKÉMON AMARILLO / AZUL / ROJO (DENTRO DE G4BRIEL)
+    // =========================================================================
+    function drawPokemonSprite(edition, x, y, color) {
+      ctx.save();
+      ctx.fillStyle = color;
+      ctx.strokeStyle = color;
+
+      if (edition === 'gb_yellow') {
+        // Pikachu pixel-art
+        ctx.fillRect(x + 6, y, 5, 10);
+        ctx.fillRect(x + 25, y, 5, 10);
+        ctx.fillStyle = "#111111";
+        ctx.fillRect(x + 6, y, 5, 4);
+        ctx.fillRect(x + 25, y, 5, 4);
+        ctx.fillStyle = color;
+        ctx.fillRect(x + 6, y + 10, 24, 20);
+        ctx.fillStyle = "#111111";
+        ctx.fillRect(x + 11, y + 15, 3, 3);
+        ctx.fillRect(x + 22, y + 15, 3, 3);
+        ctx.fillStyle = "#FF1744";
+        ctx.fillRect(x + 8, y + 21, 4, 4);
+        ctx.fillRect(x + 24, y + 21, 4, 4);
+        ctx.fillStyle = color;
+        ctx.fillRect(x + 30, y + 18, 6, 4);
+        ctx.fillRect(x + 33, y + 12, 6, 6);
+      } else if (edition === 'gb_blue') {
+        // Blastoise / Squirtle pixel-art
+        ctx.fillStyle = "#90CAF9";
+        ctx.fillRect(x + 8, y + 2, 18, 6);
+        ctx.fillRect(x + 26, y + 2, 6, 6);
+        ctx.fillStyle = color;
+        ctx.fillRect(x + 6, y + 8, 24, 22);
+        ctx.fillStyle = "#111111";
+        ctx.fillRect(x + 11, y + 13, 3, 4);
+        ctx.fillRect(x + 21, y + 13, 3, 4);
+        ctx.fillStyle = "#FFE082";
+        ctx.fillRect(x + 10, y + 20, 16, 8);
+      } else {
+        // Charizard / Charmander pixel-art
+        ctx.fillRect(x + 10, y + 2, 16, 24);
+        ctx.fillRect(x + 2, y + 8, 8, 12);
+        ctx.fillRect(x + 26, y + 8, 8, 12);
+        ctx.fillStyle = "#111111";
+        ctx.fillRect(x + 13, y + 8, 3, 3);
+        ctx.fillRect(x + 20, y + 8, 3, 3);
+        ctx.fillStyle = "#FFEA00";
+        ctx.fillRect(x + 32, y + 20, 6, 6);
+        ctx.fillStyle = "#FF1744";
+        ctx.fillRect(x + 34, y + 16, 4, 4);
+      }
+      ctx.restore();
+    }
+
+    function renderGameBoyScreen() {
+      const gb = state.gbState;
+      ctx.fillStyle = "#080A0F";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Barra superior GameBoy con el color de la edición (Amarillo, Azul o Rojo)
+      ctx.fillStyle = "#12161F";
+      ctx.fillRect(0, 0, 240, 24);
+      ctx.fillStyle = gb.color;
+      ctx.fillRect(0, 23, 240, 2);
+      drawTFTText(`GAMEBOY • ${gb.title.toUpperCase()}`, 8, 7, 1, gb.color);
+      drawTFTText(`NV.${gb.lvl}`, 202, 7, 1, TFT_COLORS.WHITE);
+
+      // Marco de pantalla GameBoy Color (arena de batalla estilo clásico)
+      drawRoundRect(10, 30, 220, 134, 6, true, true, "#141B24", gb.color);
+      drawRoundRect(14, 34, 212, 126, 4, true, false, "#0D1219", null);
+
+      // HUD de vida y barra HP del Pokémon
+      drawTFTText(`${gb.pokemon}`, 22, 42, 2, gb.color);
+      drawTFTText(`HP: ${gb.hp}/${gb.maxHp}`, 22, 62, 1, TFT_COLORS.WHITE);
+      drawRoundRect(22, 74, 114, 8, 3, true, true, "#222B38", "#455A64");
+      const hpFill = Math.max(0, Math.floor(110 * (gb.hp / gb.maxHp)));
+      const hpCol = (gb.hp > 50) ? "#00E676" : (gb.hp > 25 ? "#FFEA00" : "#FF1744");
+      if (hpFill > 0) {
+        drawRoundRect(24, 76, hpFill, 4, 2, true, false, hpCol, null);
+      }
+
+      // Plataforma y Sprite del Pokémon a la derecha
+      ctx.fillStyle = "#1E293B";
+      ctx.beginPath();
+      ctx.ellipse(178, 92, 34, 10, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = gb.color;
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+
+      drawPokemonSprite(gb.edition, 160, 54, gb.color);
+
+      // Caja de diálogo estilo Pokémon GameBoy
+      drawRoundRect(18, 106, 204, 48, 4, true, true, "#090D12", gb.color);
+      drawTFTText(gb.msg1 || `¡${gb.pokemon} listo para luchar!`, 26, 116, 1, TFT_COLORS.WHITE);
+      drawTFTText(gb.msg2 || "Elige acción con ▲ / ▼ / ● OK", 26, 134, 1, gb.color);
+
+      // Botonera de comandos GameBoy (2x2 adaptado a navegación con 3 botones)
+      const actions = [
+        { label: "⚡ ATACAR", id: 0 },
+        { label: "🔴 POKÉBALL", id: 1 },
+        { label: "💊 CURAR", id: 2 },
+        { label: "◀ SALIR", id: 3 }
+      ];
+
+      for (let i = 0; i < actions.length; i++) {
+        const col = i % 2;
+        const row = Math.floor(i / 2);
+        const bx = 10 + col * 112;
+        const by = 172 + row * 40;
+        const isSel = (gb.actionIdx === i);
+
+        drawRoundRect(
+          bx, by, 108, 34, 6, true, true,
+          isSel ? gb.color : "#141A24",
+          isSel ? "#FFFFFF" : "#2C3545"
+        );
+        drawTFTText(
+          actions[i].label,
+          bx + 12,
+          by + 12,
+          1,
+          isSel ? "#000000" : "#FFFFFF"
+        );
+      }
+
+      drawTFTText("▲/▼: Mover cursor • ● OK: Ejecutar", 22, 258, 1, "#8B949E");
+    }
+
+    function openPokemonGameBoy(editionId) {
+      if (editionId === 'gb_yellow' || editionId === 'poke_yellow') {
+        state.gbState = {
+          edition: 'gb_yellow',
+          title: 'Pokémon Amarillo',
+          pokemon: 'PIKACHU',
+          color: '#FFEA00',
+          lvl: 25,
+          hp: 100,
+          maxHp: 100,
+          actionIdx: 0,
+          msg1: '¡PIKACHU usó Impactrueno!',
+          msg2: 'Edición Especial Pikachu (GBC)'
+        };
+      } else if (editionId === 'gb_blue' || editionId === 'poke_blue') {
+        state.gbState = {
+          edition: 'gb_blue',
+          title: 'Pokémon Azul',
+          pokemon: 'BLASTOISE',
+          color: '#00E5FF',
+          lvl: 36,
+          hp: 100,
+          maxHp: 100,
+          actionIdx: 0,
+          msg1: '¡BLASTOISE listo en Kanto!',
+          msg2: 'Edición Azul (GameBoy)'
+        };
+      } else {
+        state.gbState = {
+          edition: 'gb_red',
+          title: 'Pokémon Rojo',
+          pokemon: 'CHARIZARD',
+          color: '#FF3D00',
+          lvl: 36,
+          hp: 100,
+          maxHp: 100,
+          actionIdx: 0,
+          msg1: '¡CHARIZARD lanzó Llamarada!',
+          msg2: 'Edición Roja (GameBoy)'
+        };
+      }
+      state.currentScreen = 'GAMEBOY_SCREEN';
+      renderScreen();
+    }
+
+    let monitorInterval = null;
+    function startMonitorSimulation() {
+      if (monitorInterval) clearInterval(monitorInterval);
+      let angle = 0;
+      monitorInterval = setInterval(() => {
+        if (state.currentScreen !== 'SUB_MONITOR') {
+          clearInterval(monitorInterval);
+          return;
+        }
+        angle += 0.3;
+        const nextVal = 125 + Math.sin(angle) * 45 + (Math.random() * 8 - 4);
+        state.monitorWaveData.shift();
+        state.monitorWaveData.push(nextVal);
+        renderScreen();
+      }, 70);
+    }
+
+    // =========================================================================
+    // CONTROLADORES DE LOS 3 BOTONES (UP / OK / DOWN)
+    // =========================================================================
+    let okPressCounter = 0;
+
+    function handleUp() {
+      if (isBooting || state.currentScreen === 'GITHUB_SYNC') return;
+      state.lastBtnPressed = "UP";
+      pressBtnVisual("btnUp");
+
+      if (state.currentScreen === 'GAMEBOY_SCREEN') {
+        state.gbState.actionIdx = (state.gbState.actionIdx - 1 + 4) % 4;
+        renderScreen();
+        return;
+      }
+      if (state.currentScreen === 'WIFI_KEYBOARD') {
+        state.keyboardIndex = (state.keyboardIndex - 1 + KB_KEYS.length) % KB_KEYS.length;
+        renderScreen();
+        return;
+      }
+      if (state.currentScreen === 'WIFI_SCAN') {
+        state.wifiScanIndex = (state.wifiScanIndex - 1 + state.wifiScanList.length) % state.wifiScanList.length;
+        renderScreen();
+        return;
+      }
+      if (state.currentScreen === 'JS_SCRIPT_VIEW' || state.currentScreen === 'SUB_MONITOR' || state.currentScreen === 'WIFI_SUCCESS') {
+        state.currentScreen = 'MAIN_MENU';
+        renderScreen();
+        return;
+      }
+      if (state.currentScreen === 'RGB_TEST' || state.currentScreen === 'MEM_INFO') {
+        state.currentScreen = 'SUB_SYS';
+        renderScreen();
+        return;
+      }
+      if (state.currentScreen === 'BTN_TEST') {
+        renderScreen();
+        return;
+      }
+
+      const list = getCurrentList();
+      state.opcionActual = (state.opcionActual - 1 + list.length) % list.length;
+      renderScreen();
+    }
+
+    function handleDown() {
+      if (isBooting || state.currentScreen === 'GITHUB_SYNC') return;
+      state.lastBtnPressed = "DOWN";
+      pressBtnVisual("btnDown");
+
+      if (state.currentScreen === 'GAMEBOY_SCREEN') {
+        state.gbState.actionIdx = (state.gbState.actionIdx + 1) % 4;
+        renderScreen();
+        return;
+      }
+      if (state.currentScreen === 'WIFI_KEYBOARD') {
+        state.keyboardIndex = (state.keyboardIndex + 1) % KB_KEYS.length;
+        renderScreen();
+        return;
+      }
+      if (state.currentScreen === 'WIFI_SCAN') {
+        state.wifiScanIndex = (state.wifiScanIndex + 1) % state.wifiScanList.length;
+        renderScreen();
+        return;
+      }
+      if (state.currentScreen === 'JS_SCRIPT_VIEW' || state.currentScreen === 'SUB_MONITOR' || state.currentScreen === 'WIFI_SUCCESS') {
+        state.currentScreen = 'MAIN_MENU';
+        renderScreen();
+        return;
+      }
+      if (state.currentScreen === 'RGB_TEST' || state.currentScreen === 'MEM_INFO') {
+        state.currentScreen = 'SUB_SYS';
+        renderScreen();
+        return;
+      }
+      if (state.currentScreen === 'BTN_TEST') {
+        renderScreen();
+        return;
+      }
+
+      const list = getCurrentList();
+      state.opcionActual = (state.opcionActual + 1) % list.length;
+      renderScreen();
+    }
+
+    function handleOk() {
+      if (isBooting || state.currentScreen === 'GITHUB_SYNC') return;
+      state.lastBtnPressed = "OK";
+      pressBtnVisual("btnOk");
+
+      if (state.currentScreen === 'GAMEBOY_SCREEN') {
+        const gb = state.gbState;
+        if (gb.actionIdx === 0) {
+          const moves = {
+            gb_yellow: "¡PIKACHU usó Impactrueno! ⚡",
+            gb_blue: "¡BLASTOISE usó Hidrobomba! 💧",
+            gb_red: "¡CHARIZARD usó Llamarada! 🔥"
+          };
+          gb.hp = Math.max(15, gb.hp - 15);
+          gb.lvl++;
+          gb.msg1 = moves[gb.edition] || "¡Ataque crítico!";
+          gb.msg2 = `¡Golpe crítico! Nivel sube a NV.${gb.lvl}`;
+        } else if (gb.actionIdx === 1) {
+          gb.msg1 = "¡Lanzaste una Pokéball! 🔴";
+          gb.msg2 = `¡${gb.pokemon} capturado en la Pokédex!`;
+        } else if (gb.actionIdx === 2) {
+          gb.hp = gb.maxHp;
+          gb.msg1 = "¡Usaste Superpoción! 💊";
+          gb.msg2 = `HP de ${gb.pokemon} restaurado al 100%`;
+        } else if (gb.actionIdx === 3) {
+          state.currentScreen = 'SUB_DIAG';
+        }
+        renderScreen();
+        return;
+      }
+
+      if (state.currentScreen === 'MEM_INFO') {
+        state.currentScreen = 'SUB_SYS';
+        renderScreen();
+        return;
+      }
+
+      if (state.currentScreen === 'JS_SCRIPT_VIEW' || state.currentScreen === 'SUB_MONITOR' || state.currentScreen === 'WIFI_SUCCESS') {
+        state.currentScreen = 'MAIN_MENU';
+        renderScreen();
+        return;
+      }
+
+      if (state.currentScreen === 'WIFI_KEYBOARD') {
+        const curKey = KB_KEYS[state.keyboardIndex];
+        if (curKey === '⌫') {
+          if (state.wifiPassword.length > 0) state.wifiPassword = state.wifiPassword.slice(0, -1);
+        } else if (curKey === '👁') {
+          state.wifiShowPass = !state.wifiShowPass;
+        } else if (curKey === '✔') {
+          startWifiConnection();
+        } else if (curKey === '◀') {
+          state.currentScreen = 'WIFI_SCAN';
+        } else if (curKey === '␣') {
+          state.wifiPassword += ' ';
+        } else {
+          state.wifiPassword += curKey;
+        }
+        renderScreen();
+        return;
+      }
+
+      if (state.currentScreen === 'WIFI_SCAN') {
+        const item = state.wifiScanList[state.wifiScanIndex];
+        if (item.isBack) {
+          state.currentScreen = 'SUB_CONFIG';
+        } else if (item.isForget) {
+          localStorage.removeItem("g4briel_wifi_ssid");
+          localStorage.removeItem("g4briel_wifi_pass");
+          state.hasSavedWifi = false;
+          state.savedWifiSSID = "";
+          state.savedWifiPass = "";
+          state.wifiConnected = false;
+          updateWifiScanList();
+          state.wifiScanIndex = 0;
+          showToast("Red guardada eliminada de NVS");
+        } else if (item.isSavedConnect) {
+          state.wifiSelectedSSID = state.savedWifiSSID;
+          state.wifiPassword = state.savedWifiPass;
+          startWifiConnection();
+        } else {
+          state.wifiSelectedSSID = item.ssid;
+          state.wifiPassword = "";
+          state.keyboardIndex = 2; // Inicia en 'a' (1 clic ▲ arriba es ⌫ Borrar, 2 clics ▲ es ✔ Conectar)
+          state.currentScreen = 'WIFI_KEYBOARD';
+        }
+        renderScreen();
+        return;
+      }
+
+      if (state.currentScreen === 'RGB_TEST') {
+        state.rgbTestStep++;
+        renderScreen();
+        return;
+      }
+
+      if (state.currentScreen === 'BTN_TEST') {
+        okPressCounter++;
+        if (okPressCounter >= 2) {
+          okPressCounter = 0;
+          state.currentScreen = 'SUB_SYS';
+        }
+        renderScreen();
+        return;
+      }
+
+      if (state.currentScreen === 'MAIN_MENU') {
+        const sel = state.mainMenuItems[state.opcionActual];
+        if (!sel) return;
+        if (sel.id === 'diag' || sel.script === 'apps/g4briel.js') {
+          state.currentScreen = 'SUB_DIAG';
+          state.opcionActual = 0;
+          state.scrollOffset = 0;
+        } else if (sel.id === 'info' || sel.script === 'apps/sysinfo.js') {
+          state.currentScreen = 'SUB_SYS';
+          state.opcionActual = 0;
+          state.scrollOffset = 0;
+        } else if (sel.id === 'config' || sel.script === 'system://config') {
+          state.currentScreen = 'SUB_CONFIG';
+          state.opcionActual = 0;
+          state.scrollOffset = 0;
+        } else if (sel.id === 'github_sync' || sel.script === 'system://github_sync') {
+          startGithubSyncScreen();
+          return;
+        } else if (sel.id === 'monitor' || sel.script === 'apps/monitor.js') {
+          state.currentScreen = 'SUB_MONITOR';
+          startMonitorSimulation();
+        } else {
+          state.activeScriptPath = sel.script || `apps/${sel.id}.js`;
+          state.currentScreen = 'JS_SCRIPT_VIEW';
+        }
+        renderScreen();
+        return;
+      }
+
+      if (state.currentScreen === 'SUB_DIAG') {
+        const sel = state.diagMenuItems[state.opcionActual];
+        if (!sel) return;
+        if (sel.id === 'gb_yellow' || sel.id === 'gb_blue' || sel.id === 'gb_red' || sel.id === 'poke_yellow' || sel.id === 'poke_blue' || sel.id === 'poke_red') {
+          openPokemonGameBoy(sel.id);
+          return;
+        } else if (sel.id === 'back') {
+          state.currentScreen = 'MAIN_MENU';
+          state.opcionActual = 0;
+          state.scrollOffset = 0;
+        }
+        renderScreen();
+        return;
+      }
+
+      if (state.currentScreen === 'SUB_SYS') {
+        const sel = state.sysMenuItems[state.opcionActual];
+        if (!sel) return;
+        if (sel.id === 'test_rgb') {
+          state.currentScreen = 'RGB_TEST';
+          state.rgbTestStep = 0;
+        } else if (sel.id === 'test_btn') {
+          state.currentScreen = 'BTN_TEST';
+          okPressCounter = 0;
+        } else if (sel.id === 'test_mem') {
+          state.currentScreen = 'MEM_INFO';
+        } else if (sel.id === 'back') {
+          state.currentScreen = 'MAIN_MENU';
+          state.opcionActual = 0;
+          state.scrollOffset = 0;
+        }
+        renderScreen();
+        return;
+      }
+
+      if (state.currentScreen === 'SUB_CONFIG') {
+        const sel = state.configMenuItems[state.opcionActual];
+        if (sel.id === 'cfg_wifi') {
+          updateWifiScanList();
+          state.currentScreen = 'WIFI_SCAN';
+          state.wifiScanIndex = 0;
+        } else if (sel.id === 'cfg_github') {
+          startGithubSyncScreen();
+          return;
+        } else if (sel.id === 'cfg_mode') {
+          state.layoutMode = (state.layoutMode === 'smart_list') ? 'focus_card' : 'smart_list';
+          syncManifestLayoutAndTheme();
+          showToast(`Estilo UI: ${state.layoutMode === 'smart_list' ? 'Lista Slim' : 'Focus Smartwatch'}`);
+        } else if (sel.id === 'cfg_theme') {
+          const keys = Object.keys(THEMES);
+          state.themeKey = keys[(keys.indexOf(state.themeKey) + 1) % keys.length];
+          syncManifestLayoutAndTheme();
+          showToast(`Tema: ${THEMES[state.themeKey].name}`);
+        } else if (sel.id === 'cfg_bright') {
+          state.brightnessValue = (state.brightnessValue + 20) > 100 ? 20 : (state.brightnessValue + 20);
+        } else if (sel.id === 'back') {
+          state.currentScreen = 'MAIN_MENU';
+          state.opcionActual = 0;
+          state.scrollOffset = 0;
+        }
+        renderScreen();
+        generateArduinoCode();
+        return;
+      }
+    }
+
+    function syncManifestLayoutAndTheme() {
+      try {
+        const m = JSON.parse(REPO_FILES["manifest.json"]);
+        m.layout = state.layoutMode;
+        m.theme = state.themeKey;
+        REPO_FILES["manifest.json"] = JSON.stringify(m, null, 2);
+        if (currentEditingFile === "manifest.json") {
+          document.getElementById("jsCodeEditor").value = REPO_FILES["manifest.json"];
+        }
+      } catch (e) {}
+    }
+
+    function pressBtnVisual(id) {
+      const btn = document.getElementById(id);
+      if (btn) {
+        btn.classList.add("pressed");
+        setTimeout(() => btn.classList.remove("pressed"), 140);
+      }
+    }
+
+    window.addEventListener("keydown", (e) => {
+      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+      if (state.currentScreen === 'WIFI_KEYBOARD') {
+        if (e.key === 'Backspace') {
+          e.preventDefault();
+          if (state.wifiPassword.length > 0) state.wifiPassword = state.wifiPassword.slice(0, -1);
+          renderScreen();
+          return;
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          startWifiConnection();
+          return;
+        } else if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
+          e.preventDefault();
+          state.wifiPassword += e.key;
+          // Al escribir con teclado físico, dejamos seleccionado [✔ OK!] para que al pulsar el botón ● OK conecte directo
+          state.keyboardIndex = KB_KEYS.indexOf('✔');
+          renderScreen();
+          return;
+        }
+      }
+      if (e.key === "ArrowUp") { e.preventDefault(); handleUp(); }
+      else if (e.key === "ArrowDown") { e.preventDefault(); handleDown(); }
+      else if (e.key === "Enter" || e.key === " ") { e.preventDefault(); handleOk(); }
+    });
+
+    document.getElementById("btnUp").addEventListener("click", handleUp);
+    document.getElementById("btnDown").addEventListener("click", handleDown);
+
+    // Soporte de pulsación corta (insertar letra) y pulsación larga de 0.6s en ● OK (conectar directo al WiFi)
+    let okLongPressTimer = null;
+    let okLongPressTriggered = false;
+    const btnOkEl = document.getElementById("btnOk");
+
+    function startOkPress(e) {
+      okLongPressTriggered = false;
+      if (okLongPressTimer) clearTimeout(okLongPressTimer);
+      if (state.currentScreen === 'WIFI_KEYBOARD') {
+        okLongPressTimer = setTimeout(() => {
+          okLongPressTriggered = true;
+          pressBtnVisual("btnOk");
+          showToast("¡Conectando al WiFi (Pulsación larga OK)!");
+          startWifiConnection();
+        }, 550);
+      }
+    }
+
+    function endOkPress(e) {
+      if (okLongPressTimer) {
+        clearTimeout(okLongPressTimer);
+        okLongPressTimer = null;
+      }
+    }
+
+    btnOkEl.addEventListener("mousedown", startOkPress);
+    btnOkEl.addEventListener("touchstart", startOkPress, { passive: true });
+    btnOkEl.addEventListener("mouseup", endOkPress);
+    btnOkEl.addEventListener("mouseleave", endOkPress);
+    btnOkEl.addEventListener("touchend", endOkPress);
+    btnOkEl.addEventListener("click", (e) => {
+      if (okLongPressTriggered) {
+        okLongPressTriggered = false;
+        return;
+      }
+      handleOk();
+    });
+
+    // Permitir también tocar directamente los botones [⌫ Borrar], [✔ Conectar] y [◀ Volver] en la pantalla TFT
+    canvas.addEventListener("click", (e) => {
+      if (state.currentScreen !== 'WIFI_KEYBOARD') return;
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      const cx = (e.clientX - rect.left) * scaleX;
+      const cy = (e.clientY - rect.top) * scaleY;
+
+      // Zona de los 3 botones inferiores (actY = 178 a 212)
+      if (cy >= 174 && cy <= 216) {
+        if (cx >= 8 && cx <= 76) {
+          // ⌫ Borrar
+          if (state.wifiPassword.length > 0) state.wifiPassword = state.wifiPassword.slice(0, -1);
+          state.keyboardIndex = KB_KEYS.indexOf('⌫');
+          renderScreen();
+        } else if (cx >= 82 && cx <= 158) {
+          // ✔ Conectar
+          state.keyboardIndex = KB_KEYS.indexOf('✔');
+          startWifiConnection();
+        } else if (cx >= 164 && cx <= 232) {
+          // ◀ Volver
+          state.currentScreen = 'WIFI_SCAN';
+          renderScreen();
+        }
+      }
+    });
+
+    document.getElementById("cfgGithubUrl").addEventListener("input", (e) => {
+      state.githubRepoUrl = e.target.value;
+      generateArduinoCode();
+    });
+
+    function setZoom(factor, btnEl) {
+      canvas.style.width = (240 * factor) + "px";
+      canvas.style.height = (280 * factor) + "px";
+      document.querySelectorAll(".zoom-btn").forEach(b => b.classList.remove("active"));
+      if (btnEl) btnEl.classList.add("active");
+    }
+
+    function switchTab(id, btnEl) {
+      document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+      document.querySelectorAll(".tab-content").forEach(c => c.classList.remove("active"));
+      if (btnEl) btnEl.classList.add("active");
+      document.getElementById(id).classList.add("active");
+    }
+
+    // =========================================================================
+    // GENERADOR DEL FIRMWARE C++ FINAL PARA SUBIR AL ESP32
+    // =========================================================================
+    function cleanAsciiForTFT(str) {
+      return String(str || "")
+        .replace(/[áàäâ]/g, "a").replace(/[ÁÀÄÂ]/g, "A")
+        .replace(/[éèëê]/g, "e").replace(/[ÉÈËÊ]/g, "E")
+        .replace(/[íìïî]/g, "i").replace(/[ÍÌÏÎ]/g, "I")
+        .replace(/[óòöô]/g, "o").replace(/[ÓÒÖÔ]/g, "O")
+        .replace(/[úùüû]/g, "u").replace(/[ÚÙÜÛ]/g, "U")
+        .replace(/ñ/g, "n").replace(/Ñ/g, "N")
+        .replace(/•/g, "-");
+    }
+
+    function generateArduinoCode() {
+      const itemsCArray = state.mainMenuItems.map(m => `  {"${cleanAsciiForTFT(m.title)}", "${cleanAsciiForTFT(m.sub || '')}", "${m.script || ('apps/' + m.id + '.js')}"}`).join(",\n");
+      const totalCount = state.mainMenuItems.length;
+      const cleanBootSub = cleanAsciiForTFT(state.bootSubText);
+
+      const code = `// =========================================================================
+// G4BRIEL OS - MOTOR BASE ESP32 + TFT_eSPI (240x280) + GITHUB JS OTA
+// Sube este código UNA SOLA VEZ a tu ESP32.
+// - Guarda y auto-conecta al WiFi usando memoria Flash NVS (Preferences.h)
+// - Al iniciar ejecuta la animación de arranque (boot.js)
+// - Descarga manifest.json y tus scripts .js desde tu repositorio de GitHub
+// - Interpreta comandos tft.statusBar, tft.card, tft.text, tft.rect, tft.circle
+// =========================================================================
+#include <WiFi.h>
+#include <WiFiClientSecure.h>
+#include <HTTPClient.h>
+#include <Preferences.h>
+#include <LittleFS.h>
+#include <TFT_eSPI.h>
+#include <SPI.h>
+
+TFT_eSPI tft = TFT_eSPI();
+Preferences preferences;
+
+// URL Raw de tu repositorio en GitHub donde subirás manifest.json y apps/*.js
+const char* GITHUB_REPO_URL = "${state.githubRepoUrl}";
+
+const int PIN_UP   = 25;
+const int PIN_DOWN = 26;
+const int PIN_OK   = 27;
+
+enum MenuLayout { LAYOUT_SLIM_LIST, LAYOUT_FOCUS_SMARTWATCH };
+MenuLayout currentLayout = ${state.layoutMode === 'smart_list' ? 'LAYOUT_SLIM_LIST' : 'LAYOUT_FOCUS_SMARTWATCH'};
+
+enum ThemeId { THEME_ORANGE, THEME_CYAN, THEME_GREEN, THEME_WHITE };
+ThemeId currentTheme = ${state.themeKey === 'cyber_orange' ? 'THEME_ORANGE' : (state.themeKey === 'neon_cyan' ? 'THEME_CYAN' : (state.themeKey === 'matrix_green' ? 'THEME_GREEN' : 'THEME_WHITE'))};
+
+struct ThemePalette {
+  const char* name;
+  uint16_t accent;
+  uint16_t accentBg;
+  uint16_t cardBg;
+  uint16_t cardBorder;
+  uint16_t textPrimary;
+  uint16_t textSecondary;
+};
+
+const ThemePalette themes[4] = {
+  { "Naranja", TFT_ORANGE, 0x3A00, 0x18E3, 0x2965, TFT_WHITE, 0xA510 },
+  { "Cian",    TFT_CYAN,   0x01E6, 0x08A6, 0x11AB, TFT_WHITE, 0x54FB },
+  { "Verde",   TFT_GREEN,  0x02E0, 0x08A2, 0x11A4, TFT_WHITE, 0x56E5 },
+  { "Blanco",  TFT_WHITE,  0x31A6, 0x10A2, 0x4208, TFT_WHITE, 0x8410 }
+};
+
+enum ScreenState {
+  STATE_MAIN_MENU,
+  STATE_G4BRIEL_GAMEBOY,
+  STATE_POKEMON_PLAY,
+  STATE_SISTEMA_TESTS,
+  STATE_CONFIGURACION,
+  STATE_WIFI_KEYBOARD,
+  STATE_JS_APP
+};
+ScreenState currentState = STATE_MAIN_MENU;
+
+struct MenuItem {
+  String title;
+  String subtitle;
+  String scriptPath;
+};
+
+const int MAX_MENU_ITEMS = 12;
+int totalMainItems = ${totalCount};
+MenuItem mainItems[MAX_MENU_ITEMS] = {
+${itemsCArray}
+};
+
+// Submenú g4briel: Juegos de GameBoy (Pokémon Amarillo, Azul y Rojo)
+const int TOTAL_GAMEBOY = 4;
+const char* gameboyTitles[TOTAL_GAMEBOY] = {
+  "Pokemon Amarillo",
+  "Pokemon Azul",
+  "Pokemon Rojo",
+  "< Volver"
+};
+const uint16_t gameboyColors[TOTAL_GAMEBOY] = {
+  TFT_YELLOW,
+  TFT_CYAN,
+  TFT_RED,
+  TFT_WHITE
+};
+int activePokemonEdition = 0; // 0: Amarillo, 1: Azul, 2: Rojo
+
+// Submenú Sistema & Tests (pruebas movidas aquí)
+const int TOTAL_SYS_TESTS = 4;
+const char* sysTestTitles[TOTAL_SYS_TESTS] = {
+  "Test Pantalla RGB",
+  "Test 3 Botones",
+  "Memoria & Scripts",
+  "< Volver"
+};
+
+const int TOTAL_CONFIG = 5;
+const char* configTitles[TOTAL_CONFIG] = {
+  "Conectar WiFi",
+  "Sync GitHub JS",
+  "Estilo UI",
+  "Tema Color",
+  "< Volver"
+};
+
+int selectedIndex = 0;
+int scrollOffset  = 0;
+
+const char keyboardKeys[] = "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ._-@#$%&*!? ";
+const int TOTAL_KEYS = sizeof(keyboardKeys) - 1;
+int keyboardIndex = 0;
+
+String wifiTargetSSID = "${state.savedWifiSSID || 'Mi_Casa_5G'}";
+String wifiPassword   = "${state.savedWifiPass || ''}";
+bool wifiConnected    = false;
+bool hasSavedWifi     = false;
+String activeJsFile   = "";
+
+const int SCREEN_W = 240;
+const int SCREEN_H = 280;
+const int STATUS_H = 24;
+const int ITEM_H   = 35;
+const int ITEM_W   = 206;
+const int SPACING  = 5;
+const int VISIBLE_ITEMS = 5;
+
+// Prototipos
+void animacionInicio();
+void sincronizarDesdeGitHub();
+bool descargarArchivoGitHub(const char* rutaRelativa);
+void ejecutarScriptJS(String scriptPath);
+void dibujarPantalla();
+void ejecutarSeleccion();
+void dibujarTecladoWifi();
+void conectarWifi(String ssid, String pass);
+
+void setup() {
+  Serial.begin(115200);
+
+  pinMode(PIN_UP,   INPUT_PULLUP);
+  pinMode(PIN_DOWN, INPUT_PULLUP);
+  pinMode(PIN_OK,   INPUT_PULLUP);
+
+  tft.init();
+  tft.setRotation(0);
+  tft.fillScreen(TFT_BLACK);
+  tft.invertDisplay(true);
+
+  // 1. Montar sistema de archivos LittleFS en la Flash del ESP32
+  LittleFS.begin(true);
+
+  // 2. Cargar WiFi guardado en memoria NVS (Preferences.h)
+  preferences.begin("g4briel_wifi", false);
+  String savedSSID = preferences.getString("ssid", "");
+  String savedPass = preferences.getString("pass", "");
+  currentLayout = (MenuLayout)preferences.getInt("layout", (int)currentLayout);
+  currentTheme  = (ThemeId)preferences.getInt("theme", (int)currentTheme);
+
+  if (savedSSID.length() > 0) {
+    hasSavedWifi = true;
+    wifiTargetSSID = savedSSID;
+    wifiPassword   = savedPass;
+    WiFi.begin(savedSSID.c_str(), savedPass.c_str());
+  }
+
+  // 3. Ejecutar animación de arranque apenas inicia
+  animacionInicio();
+
+  if (WiFi.status() == WL_CONNECTED) {
+    wifiConnected = true;
+  }
+
+  dibujarPantalla();
+}
+
+void loop() {
+  if (currentState == STATE_JS_APP) {
+    if (digitalRead(PIN_OK) == LOW || digitalRead(PIN_UP) == LOW || digitalRead(PIN_DOWN) == LOW) {
+      currentState = STATE_MAIN_MENU;
+      dibujarPantalla();
+      delay(250);
+    }
+    return;
+  }
+
+  if (currentState == STATE_WIFI_KEYBOARD) {
+    if (digitalRead(PIN_UP) == LOW) {
+      keyboardIndex = (keyboardIndex - 1 + TOTAL_KEYS + 2) % (TOTAL_KEYS + 2);
+      dibujarTecladoWifi();
+      delay(150);
+    }
+    if (digitalRead(PIN_DOWN) == LOW) {
+      keyboardIndex = (keyboardIndex + 1) % (TOTAL_KEYS + 2);
+      dibujarTecladoWifi();
+      delay(150);
+    }
+    if (digitalRead(PIN_OK) == LOW) {
+      // Si mantiene presionado PIN_OK (Pin 27) por 600ms, conecta directo al WiFi desde cualquier letra
+      unsigned long tPress = millis();
+      while (digitalRead(PIN_OK) == LOW && (millis() - tPress) < 600) {
+        delay(10);
+      }
+      if ((millis() - tPress) >= 600) {
+        conectarWifi(wifiTargetSSID, wifiPassword);
+        return;
+      }
+
+      if (keyboardIndex == TOTAL_KEYS) {
+        if (wifiPassword.length() > 0) wifiPassword.remove(wifiPassword.length() - 1);
+      } else if (keyboardIndex == TOTAL_KEYS + 1) {
+        conectarWifi(wifiTargetSSID, wifiPassword);
+        return;
+      } else {
+        wifiPassword += keyboardKeys[keyboardIndex];
+      }
+      dibujarTecladoWifi();
+      delay(180);
+    }
+    return;
+  }
+
+  if (currentState == STATE_POKEMON_PLAY) {
+    if (digitalRead(PIN_OK) == LOW || digitalRead(PIN_UP) == LOW || digitalRead(PIN_DOWN) == LOW) {
+      currentState = STATE_G4BRIEL_GAMEBOY;
+      dibujarPantalla();
+      delay(250);
+    }
+    return;
+  }
+
+  int maxItems = totalMainItems;
+  if (currentState == STATE_G4BRIEL_GAMEBOY) maxItems = TOTAL_GAMEBOY;
+  else if (currentState == STATE_SISTEMA_TESTS) maxItems = TOTAL_SYS_TESTS;
+  else if (currentState == STATE_CONFIGURACION) maxItems = TOTAL_CONFIG;
+
+  if (digitalRead(PIN_UP) == LOW) {
+    selectedIndex = (selectedIndex > 0) ? (selectedIndex - 1) : (maxItems - 1);
+    dibujarPantalla();
+    delay(180);
+  }
+
+  if (digitalRead(PIN_DOWN) == LOW) {
+    selectedIndex = (selectedIndex < maxItems - 1) ? (selectedIndex + 1) : 0;
+    dibujarPantalla();
+    delay(180);
+  }
+
+  if (digitalRead(PIN_OK) == LOW) {
+    ejecutarSeleccion();
+    delay(250);
+  }
+}
+
+void dibujarIconoWifi(int x, int y, uint16_t color) {
+  tft.drawCircleHelper(x + 7, y + 12, 8, 1 | 2, color);
+  tft.drawCircleHelper(x + 7, y + 12, 5, 1 | 2, color);
+  tft.fillCircle(x + 7, y + 12, 1, color);
+}
+
+void dibujarBarraEstado(const char* titulo) {
+  const ThemePalette& th = themes[currentTheme];
+  tft.fillRect(0, 0, SCREEN_W, STATUS_H, 0x10A2);
+  tft.drawFastHLine(0, STATUS_H - 1, SCREEN_W, th.cardBorder);
+
+  tft.setTextColor(th.accent, 0x10A2);
+  tft.setTextSize(1);
+  tft.drawString(titulo, 8, 8);
+
+  dibujarIconoWifi(SCREEN_W - 50, 2, wifiConnected ? TFT_GREEN : th.accent);
+
+  tft.drawRect(SCREEN_W - 28, 7, 18, 9, TFT_LIGHTGREY);
+  tft.fillRect(SCREEN_W - 10, 9, 2, 5, TFT_LIGHTGREY);
+  tft.fillRect(SCREEN_W - 26, 9, 12, 5, TFT_GREEN);
+}
+
+void animacionInicio() {
+  tft.fillScreen(TFT_BLACK);
+  const ThemePalette& th = themes[currentTheme];
+  for (int r = 10; r <= 32; r += 5) {
+    tft.drawCircle(120, 85, r, th.accent);
+    delay(28);
+  }
+  tft.fillRoundRect(106, 71, 28, 28, 6, th.accentBg);
+  tft.drawRoundRect(106, 71, 28, 28, 6, th.accent);
+  tft.fillRect(116, 81, 8, 8, th.accent);
+
+  tft.setTextColor(TFT_WHITE, TFT_BLACK);
+  tft.setTextSize(2);
+  tft.drawString("${cleanAsciiForTFT(state.bootLogoText)}", 56, 130);
+  tft.setTextColor(th.textSecondary, TFT_BLACK);
+  tft.setTextSize(1);
+  tft.drawString("${cleanBootSub}", 44, 154);
+
+  const int barX = 30, barY = 195, barW = 180, barH = 8;
+  tft.drawRoundRect(barX, barY, barW, barH, 4, th.cardBorder);
+
+  for (int p = 0; p <= 100; p += 5) {
+    int fillW = map(p, 0, 100, 0, barW - 4);
+    tft.fillRoundRect(barX + 2, barY + 2, fillW, barH - 4, 2, th.accent);
+    delay(25);
+  }
+  delay(200);
+  tft.fillScreen(TFT_BLACK);
+}
+
+// =========================================================================
+// DESCARGA OTA DE ARCHIVOS .JS DESDE TU REPOSITORIO GITHUB
+// =========================================================================
+bool descargarArchivoGitHub(const char* rutaRelativa) {
+  if (WiFi.status() != WL_CONNECTED) return false;
+
+  WiFiClientSecure client;
+  client.setInsecure();
+  HTTPClient https;
+
+  String url = String(GITHUB_REPO_URL) + "/" + String(rutaRelativa);
+  if (https.begin(client, url)) {
+    int httpCode = https.GET();
+    if (httpCode == HTTP_CODE_OK) {
+      String payload = https.getString();
+      String localPath = "/" + String(rutaRelativa);
+      if (localPath.indexOf("/apps/") == 0 && !LittleFS.exists("/apps")) {
+        LittleFS.mkdir("/apps");
+      }
+      File f = LittleFS.open(localPath, FILE_WRITE);
+      if (f) {
+        f.print(payload);
+        f.close();
+      }
+      https.end();
+      return true;
+    }
+    https.end();
+  }
+  return false;
+}
+
+void sincronizarDesdeGitHub() {
+  const ThemePalette& th = themes[currentTheme];
+  tft.fillScreen(TFT_BLACK);
+  dibujarBarraEstado("GITHUB OTA SYNC");
+
+  tft.setTextColor(TFT_WHITE, TFT_BLACK);
+  tft.setTextSize(1);
+  tft.drawString("Repositorio GitHub:", 16, 40);
+  tft.setTextColor(th.accent, TFT_BLACK);
+  tft.drawString(GITHUB_REPO_URL, 16, 56);
+
+  const int barX = 20, barY = 140, barW = 200, barH = 12;
+  tft.drawRoundRect(barX, barY, barW, barH, 4, th.cardBorder);
+
+  descargarArchivoGitHub("manifest.json");
+  descargarArchivoGitHub("apps/boot.js");
+
+  for (int i = 0; i < totalMainItems; i++) {
+    String script = mainItems[i].scriptPath;
+    if (!script.startsWith("system://")) {
+      tft.fillRect(20, 110, 200, 20, TFT_BLACK);
+      tft.setTextColor(TFT_WHITE, TFT_BLACK);
+      tft.drawString(("GET /" + script).c_str(), 20, 110);
+      descargarArchivoGitHub(script.c_str());
+    }
+    int fillW = map(i + 1, 0, totalMainItems, 30, barW - 4);
+    tft.fillRoundRect(barX + 2, barY + 2, fillW, barH - 4, 2, th.accent);
+    delay(200);
+  }
+
+  tft.setTextColor(TFT_GREEN, TFT_BLACK);
+  tft.drawString("Scripts .js actualizados!", 40, 180);
+  delay(900);
+
+  currentState = STATE_MAIN_MENU;
+  selectedIndex = 0;
+  dibujarPantalla();
+}
+
+// =========================================================================
+// INTÉRPRETE LIGERO DE COMANDOS TFT EN ARCHIVOS .JS DESCARGADOS
+// =========================================================================
+void ejecutarScriptJS(String scriptPath) {
+  const ThemePalette& th = themes[currentTheme];
+  currentState = STATE_JS_APP;
+  tft.fillScreen(TFT_BLACK);
+
+  File f = LittleFS.open("/" + scriptPath, FILE_READ);
+  if (!f) {
+    dibujarBarraEstado("APP JS");
+    tft.fillRoundRect(12, 40, 216, 120, 8, th.cardBg);
+    tft.drawRoundRect(12, 40, 216, 120, 8, th.cardBorder);
+    tft.setTextColor(th.accent, th.cardBg);
+    tft.setTextSize(1);
+    tft.drawString(("Archivo: /" + scriptPath).c_str(), 22, 60);
+    tft.setTextColor(TFT_WHITE, th.cardBg);
+    tft.drawString("Pulsa 'GitHub Sync' para", 22, 85);
+    tft.drawString("descargar este .js del repo", 22, 102);
+    return;
+  }
+
+  // Interpretar llamadas tft.statusBar, tft.card, tft.rect, tft.text línea por línea
+  while (f.available()) {
+    String line = f.readStringUntil('\\n');
+    line.trim();
+
+    if (line.indexOf("tft.statusBar(") >= 0) {
+      int q1 = line.indexOf('"') + 1;
+      int q2 = line.lastIndexOf('"');
+      if (q1 > 0 && q2 > q1) dibujarBarraEstado(line.substring(q1, q2).c_str());
+    } else if (line.indexOf("tft.card(") >= 0) {
+      int p1 = line.indexOf('(') + 1;
+      int p2 = line.indexOf(')');
+      String args = line.substring(p1, p2);
+      int x = args.substring(0, args.indexOf(',')).toInt(); args = args.substring(args.indexOf(',') + 1);
+      int y = args.substring(0, args.indexOf(',')).toInt(); args = args.substring(args.indexOf(',') + 1);
+      int w = args.substring(0, args.indexOf(',')).toInt(); args = args.substring(args.indexOf(',') + 1);
+      int h = args.toInt();
+      tft.fillRoundRect(x, y, w, h, 6, th.cardBg);
+      tft.drawRoundRect(x, y, w, h, 6, th.cardBorder);
+    } else if (line.indexOf("tft.text(") >= 0) {
+      int q1 = line.indexOf('"') + 1;
+      int q2 = line.indexOf('"', q1);
+      String txt = line.substring(q1, q2);
+      String rest = line.substring(line.indexOf(',', q2) + 1);
+      int x = rest.substring(0, rest.indexOf(',')).toInt(); rest = rest.substring(rest.indexOf(',') + 1);
+      int y = rest.substring(0, rest.indexOf(',')).toInt(); rest = rest.substring(rest.indexOf(',') + 1);
+      int sz = rest.substring(0, rest.indexOf(',')).toInt();
+      tft.setTextSize(sz > 0 ? sz : 1);
+      tft.setTextColor(TFT_WHITE, th.cardBg);
+      tft.drawString(txt.c_str(), x, y);
+    }
+  }
+  f.close();
+}
+
+void dibujarGameBoyPokemon() {
+  tft.fillScreen(TFT_BLACK);
+  uint16_t col = gameboyColors[activePokemonEdition];
+  const char* titles[3]   = { "POKEMON AMARILLO", "POKEMON AZUL", "POKEMON ROJO" };
+  const char* pokemons[3] = { "PIKACHU  NV.25",   "BLASTOISE NV.36", "CHARIZARD NV.36" };
+  const char* moves[3]    = { "Impactrueno!",     "Hidrobomba!",     "Llamarada!" };
+
+  dibujarBarraEstado(titles[activePokemonEdition]);
+  tft.drawRoundRect(10, 32, 220, 140, 6, col);
+  tft.setTextColor(col, TFT_BLACK);
+  tft.setTextSize(2);
+  tft.drawString(pokemons[activePokemonEdition], 22, 48);
+
+  tft.setTextColor(TFT_WHITE, TFT_BLACK);
+  tft.setTextSize(1);
+  tft.drawString("HP: 100/100 [============]", 22, 76);
+
+  tft.fillRoundRect(18, 108, 204, 52, 4, 0x08A2);
+  tft.drawRoundRect(18, 108, 204, 52, 4, col);
+  tft.setTextColor(TFT_WHITE, 0x08A2);
+  tft.drawString("Batalla GameBoy Color:", 26, 118);
+  tft.setTextColor(col, 0x08A2);
+  tft.drawString(moves[activePokemonEdition], 26, 136);
+
+  tft.fillRoundRect(20, 215, 200, 36, 6, 0x18E3);
+  tft.drawRoundRect(20, 215, 200, 36, 6, col);
+  tft.setTextColor(TFT_WHITE, 0x18E3);
+  tft.drawString("OK / UP / DOWN: Volver", 44, 228);
+}
+
+void dibujarListaSlim() {
+  const ThemePalette& th = themes[currentTheme];
+  tft.fillScreen(TFT_BLACK);
+  int total = totalMainItems;
+  const char* header = "${state.menuTitle}";
+  if (currentState == STATE_G4BRIEL_GAMEBOY) { total = TOTAL_GAMEBOY; header = "G4BRIEL - GAMEBOY"; }
+  else if (currentState == STATE_SISTEMA_TESTS) { total = TOTAL_SYS_TESTS; header = "SISTEMA & TESTS"; }
+  else if (currentState == STATE_CONFIGURACION) { total = TOTAL_CONFIG; header = "CONFIGURACION"; }
+  dibujarBarraEstado(header);
+
+  if (selectedIndex < scrollOffset) scrollOffset = selectedIndex;
+  else if (selectedIndex >= scrollOffset + VISIBLE_ITEMS) scrollOffset = selectedIndex - VISIBLE_ITEMS + 1;
+
+  int startY = STATUS_H + 7;
+  int itemX = (SCREEN_W - ITEM_W) / 2 - 2;
+
+  for (int i = 0; i < VISIBLE_ITEMS; i++) {
+    int itemIdx = scrollOffset + i;
+    if (itemIdx >= total) break;
+
+    int y = startY + (i * (ITEM_H + SPACING));
+    bool isSel = (itemIdx == selectedIndex);
+    String label = mainItems[itemIdx].title;
+    uint16_t itemAccent = th.accent;
+
+    if (currentState == STATE_G4BRIEL_GAMEBOY) {
+      label = String(gameboyTitles[itemIdx]);
+      itemAccent = gameboyColors[itemIdx];
+    } else if (currentState == STATE_SISTEMA_TESTS) {
+      label = String(sysTestTitles[itemIdx]);
+    } else if (currentState == STATE_CONFIGURACION) {
+      label = String(configTitles[itemIdx]);
+    }
+
+    if (isSel) {
+      tft.fillRoundRect(itemX, y, ITEM_W, ITEM_H, 6, th.accentBg);
+      tft.drawRoundRect(itemX, y, ITEM_W, ITEM_H, 6, itemAccent);
+      tft.fillRect(itemX + 2, y + 6, 3, ITEM_H - 12, itemAccent);
+      tft.setTextColor(TFT_WHITE, th.accentBg);
+    } else {
+      tft.fillRoundRect(itemX, y, ITEM_W, ITEM_H, 6, th.cardBg);
+      tft.drawRoundRect(itemX, y, ITEM_W, ITEM_H, 6, th.cardBorder);
+      tft.setTextColor(currentState == STATE_G4BRIEL_GAMEBOY ? itemAccent : TFT_LIGHTGREY, th.cardBg);
+    }
+    tft.setTextSize(2);
+    tft.drawString(label.c_str(), itemX + 24, y + (ITEM_H - 14) / 2);
+  }
+}
+
+void dibujarFocusCard() {
+  const ThemePalette& th = themes[currentTheme];
+  tft.fillScreen(TFT_BLACK);
+  const char* header = "${state.menuTitle}";
+  String curTitle = mainItems[selectedIndex].title;
+  String curSub   = mainItems[selectedIndex].subtitle;
+  uint16_t accent = th.accent;
+
+  if (currentState == STATE_G4BRIEL_GAMEBOY) {
+    header = "G4BRIEL - GAMEBOY";
+    curTitle = String(gameboyTitles[selectedIndex]);
+    curSub = "GameBoy Color Edition";
+    accent = gameboyColors[selectedIndex];
+  } else if (currentState == STATE_SISTEMA_TESTS) {
+    header = "SISTEMA & TESTS";
+    curTitle = String(sysTestTitles[selectedIndex]);
+    curSub = "Diagnostico de Hardware";
+  } else if (currentState == STATE_CONFIGURACION) {
+    header = "CONFIGURACION";
+    curTitle = String(configTitles[selectedIndex]);
+    curSub = "OK para cambiar";
+  }
+  dibujarBarraEstado(header);
+
+  int centerY = STATUS_H + 48;
+  tft.fillRoundRect(14, centerY, 212, 100, 10, th.accentBg);
+  tft.drawRoundRect(14, centerY, 212, 100, 10, accent);
+
+  tft.setTextColor(accent, th.accentBg);
+  tft.setTextSize(2);
+  tft.drawString(curTitle.c_str(), 28, centerY + 20);
+
+  tft.setTextColor(th.textSecondary, th.accentBg);
+  tft.setTextSize(1);
+  tft.drawString(curSub.c_str(), 28, centerY + 52);
+}
+
+void dibujarTecladoWifi() {
+  const ThemePalette& th = themes[currentTheme];
+  tft.fillScreen(TFT_BLACK);
+  dibujarBarraEstado("TECLADO WIFI");
+
+  tft.fillRoundRect(8, 28, 224, 54, 6, th.cardBg);
+  tft.drawRoundRect(8, 28, 224, 54, 6, th.cardBorder);
+  tft.setTextColor(th.accent, th.cardBg);
+  tft.setTextSize(1);
+  tft.drawString(("Red: " + wifiTargetSSID + " (" + String(wifiPassword.length()) + ")").c_str(), 14, 32);
+
+  tft.setTextColor(TFT_WHITE, th.cardBg);
+  String fullPass = wifiPassword + "_";
+  if (fullPass.length() <= 16) {
+    tft.setTextSize(2);
+    tft.drawString(fullPass.c_str(), 14, 48);
+  } else {
+    // Si la contraseña es muy larga, usar 2 líneas de tamaño 1 (hasta 64 caracteres sin salirse de pantalla)
+    tft.setTextSize(1);
+    String vis = fullPass;
+    if (vis.length() > 62) vis = "<<" + vis.substring(vis.length() - 60);
+    String l1 = vis.substring(0, min((unsigned int)32, vis.length()));
+    tft.drawString(l1.c_str(), 14, 48);
+    if (vis.length() > 32) {
+      String l2 = vis.substring(32);
+      tft.setTextColor(TFT_GREEN, th.cardBg);
+      tft.drawString(l2.c_str(), 14, 62);
+    }
+  }
+
+  int drumY = 90;
+  tft.fillRoundRect(8, drumY, 224, 85, 8, 0x08A2);
+  tft.drawRoundRect(8, drumY, 224, 85, 8, th.cardBorder);
+
+  int kx = 104, ky = drumY + 24;
+  tft.fillRoundRect(kx - 8, ky, 48, 34, 6, th.accentBg);
+  tft.drawRoundRect(kx - 8, ky, 48, 34, 6, th.accent);
+  tft.setTextColor(TFT_WHITE, th.accentBg);
+
+  if (keyboardIndex == TOTAL_KEYS) {
+    tft.setTextSize(2);
+    tft.drawString("BORR", kx - 4, ky + 10);
+  } else if (keyboardIndex == TOTAL_KEYS + 1) {
+    tft.setTextColor(TFT_GREEN, th.accentBg);
+    tft.setTextSize(2);
+    tft.drawString("OK!", kx, ky + 10);
+  } else {
+    char curChar[2] = { keyboardKeys[keyboardIndex], '\\0' };
+    tft.setTextSize(3);
+    tft.drawString(curChar, kx + 8, ky + 6);
+  }
+
+  tft.setTextColor(TFT_WHITE, TFT_BLACK);
+  tft.setTextSize(1);
+  tft.drawString("1 clic UP desde 'a' = [OK! Conectar]", 12, 195);
+  tft.setTextColor(TFT_GREEN, TFT_BLACK);
+  tft.drawString("O manten presionado OK (0.6s)", 24, 214);
+}
+
+void conectarWifi(String ssid, String pass) {
+  tft.fillScreen(TFT_BLACK);
+  dibujarBarraEstado("CONECTANDO...");
+  WiFi.begin(ssid.c_str(), pass.c_str());
+
+  int intentos = 0;
+  while (WiFi.status() != WL_CONNECTED && intentos < 20) {
+    delay(400);
+    intentos++;
+  }
+
+  if (WiFi.status() == WL_CONNECTED) {
+    wifiConnected = true;
+    preferences.putString("ssid", ssid);
+    preferences.putString("pass", pass);
+    hasSavedWifi = true;
+  }
+  currentState = STATE_MAIN_MENU;
+  dibujarPantalla();
+}
+
+void dibujarPantalla() {
+  if (currentState == STATE_WIFI_KEYBOARD) {
+    dibujarTecladoWifi();
+    return;
+  }
+  if (currentState == STATE_POKEMON_PLAY) {
+    dibujarGameBoyPokemon();
+    return;
+  }
+  if (currentLayout == LAYOUT_SLIM_LIST) dibujarListaSlim();
+  else dibujarFocusCard();
+}
+
+void ejecutarSeleccion() {
+  if (currentState == STATE_MAIN_MENU) {
+    String script = mainItems[selectedIndex].scriptPath;
+    if (script == "apps/g4briel.js") {
+      currentState = STATE_G4BRIEL_GAMEBOY;
+      selectedIndex = 0;
+      scrollOffset = 0;
+      dibujarPantalla();
+    } else if (script == "apps/sysinfo.js") {
+      currentState = STATE_SISTEMA_TESTS;
+      selectedIndex = 0;
+      scrollOffset = 0;
+      dibujarPantalla();
+    } else if (script == "system://config") {
+      currentState = STATE_CONFIGURACION;
+      selectedIndex = 0;
+      scrollOffset = 0;
+      dibujarPantalla();
+    } else if (script == "system://github_sync") {
+      sincronizarDesdeGitHub();
+    } else {
+      ejecutarScriptJS(script);
+    }
+    return;
+  }
+
+  if (currentState == STATE_G4BRIEL_GAMEBOY) {
+    if (selectedIndex < 3) {
+      activePokemonEdition = selectedIndex;
+      currentState = STATE_POKEMON_PLAY;
+      dibujarPantalla();
+    } else {
+      currentState = STATE_MAIN_MENU;
+      selectedIndex = 0;
+      scrollOffset = 0;
+      dibujarPantalla();
+    }
+    return;
+  }
+
+  if (currentState == STATE_SISTEMA_TESTS) {
+    if (selectedIndex == 0) {
+      tft.fillScreen(TFT_RED); delay(350);
+      tft.fillScreen(TFT_GREEN); delay(350);
+      tft.fillScreen(TFT_BLUE); delay(350);
+      dibujarPantalla();
+    } else if (selectedIndex == 1 || selectedIndex == 2) {
+      ejecutarScriptJS("apps/sysinfo.js");
+    } else {
+      currentState = STATE_MAIN_MENU;
+      selectedIndex = 0;
+      scrollOffset = 0;
+      dibujarPantalla();
+    }
+    return;
+  }
+
+  if (currentState == STATE_CONFIGURACION) {
+    if (selectedIndex == 0) {
+      currentState = STATE_WIFI_KEYBOARD;
+      keyboardIndex = 0;
+      dibujarTecladoWifi();
+    } else if (selectedIndex == 1) {
+      sincronizarDesdeGitHub();
+    } else if (selectedIndex == 2) {
+      currentLayout = (currentLayout == LAYOUT_SLIM_LIST) ? LAYOUT_FOCUS_SMARTWATCH : LAYOUT_SLIM_LIST;
+      preferences.putInt("layout", (int)currentLayout);
+      dibujarPantalla();
+    } else if (selectedIndex == 3) {
+      currentTheme = (ThemeId)((currentTheme + 1) % 4);
+      preferences.putInt("theme", (int)currentTheme);
+      dibujarPantalla();
+    } else if (selectedIndex == 4) {
+      currentState = STATE_MAIN_MENU;
+      selectedIndex = 0;
+      scrollOffset = 0;
+      dibujarPantalla();
+    }
+  }
+}`;
+
+      document.getElementById("arduinoCodeBox").textContent = code;
+    }
+
+    function copyArduinoCode() {
+      const code = document.getElementById("arduinoCodeBox").textContent;
+      navigator.clipboard.writeText(code).then(() => {
+        showToast("¡Firmware C++ copiado! Listo para subir al ESP32");
+      });
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById("toast");
+      t.textContent = msg;
+      t.classList.add("show");
+      setTimeout(() => t.classList.remove("show"), 2500);
+    }
+
+    window.addEventListener("DOMContentLoaded", () => {
+      updateWifiScanList();
+      applyAllRepoFilesToState();
+      renderFilePills();
+      selectFileToEdit("manifest.json");
+      setZoom(1.4, document.querySelectorAll(".zoom-btn")[1]);
+      generateArduinoCode();
+      triggerBootAnimation();
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,44 @@
+{
+  "os_name": "G4BRIEL OS",
+  "version": "1.2.0",
+  "boot_script": "boot.js",
+  "default_layout": "smart_list",
+  "default_theme": "cyber_orange",
+  "menu_order": [
+    {
+      "id": "diag",
+      "title": "g4briel",
+      "icon": "🩺",
+      "sub": "Diagnóstico y hardware",
+      "script": "apps/g4briel.js"
+    },
+    {
+      "id": "monitor",
+      "title": "Monitor ADC",
+      "icon": "📊",
+      "sub": "Osciloscopio GPIO34",
+      "script": "apps/monitor.js"
+    },
+    {
+      "id": "github_sync",
+      "title": "GitHub Sync",
+      "icon": "🔄",
+      "sub": "Descargar apps .js del repo",
+      "script": "system://github_sync"
+    },
+    {
+      "id": "config",
+      "title": "Configuración",
+      "icon": "⚙️",
+      "sub": "WiFi NVS, UI y Temas",
+      "script": "system://config"
+    },
+    {
+      "id": "info",
+      "title": "Sistema JS",
+      "icon": "ℹ️",
+      "sub": "Estado LittleFS & RAM",
+      "script": "apps/sysinfo.js"
+    }
+  ]
+}
