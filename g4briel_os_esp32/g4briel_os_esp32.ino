@@ -1,6 +1,7 @@
 // =========================================================================
-// G4BRIEL OS - MOTOR BASE ESP32 + TFT_eSPI (240x280) + GITHUB JS OTA
-// Sube este archivo (g4briel_os_esp32.ino) UNA SOLA VEZ a tu ESP32 en Arduino IDE.
+// G4BRIEL OS - MOTOR BASE ESP32 + TFT_eSPI (280x240 HORIZONTAL) + GITHUB OTA
+// Sube este archivo (g4briel_os_esp32.ino) a tu ESP32 en Arduino IDE.
+// - Modo HORIZONTAL (280x240): tft.setRotation(1) (o cambialo a 3 en Config)
 // - Guarda y auto-conecta al WiFi usando memoria Flash NVS (Preferences.h)
 // - Al iniciar ejecuta la animacion de arranque (boot.js)
 // - Descarga manifest.json y tus scripts .js desde tu repositorio de GitHub
@@ -23,6 +24,9 @@ const char* GITHUB_REPO_URL = "https://raw.githubusercontent.com/christoper-d/es
 const int PIN_UP   = 25;
 const int PIN_DOWN = 26;
 const int PIN_OK   = 27;
+
+// Rotacion horizontal: 1 (280x240 normal) o 3 (280x240 invertido 180 grados)
+int screenRotation = 1;
 
 enum MenuLayout { LAYOUT_SLIM_LIST, LAYOUT_FOCUS_SMARTWATCH };
 MenuLayout currentLayout = LAYOUT_SLIM_LIST;
@@ -95,7 +99,7 @@ const uint16_t gameboyColors[TOTAL_GAMEBOY] = {
 };
 int activePokemonEdition = 0; // 0: Amarillo, 1: Azul, 2: Rojo
 
-// Submenu Sistema & Tests (pruebas movidas aqui)
+// Submenu Sistema & Tests
 const int TOTAL_SYS_TESTS = 4;
 const char* sysTestTitles[TOTAL_SYS_TESTS] = {
   "Test Pantalla RGB",
@@ -104,12 +108,13 @@ const char* sysTestTitles[TOTAL_SYS_TESTS] = {
   "< Volver"
 };
 
-const int TOTAL_CONFIG = 5;
+const int TOTAL_CONFIG = 6;
 const char* configTitles[TOTAL_CONFIG] = {
   "Conectar WiFi",
   "Sync GitHub JS",
   "Estilo UI",
   "Tema Color",
+  "Girar Horiz (1/3)",
   "< Volver"
 };
 
@@ -126,11 +131,12 @@ bool wifiConnected    = false;
 bool hasSavedWifi     = false;
 String activeJsFile   = "";
 
-const int SCREEN_W = 240;
-const int SCREEN_H = 280;
+// DIMENSIONES EN MODO HORIZONTAL (280 ancho x 240 alto)
+const int SCREEN_W = 280;
+const int SCREEN_H = 240;
 const int STATUS_H = 24;
-const int ITEM_H   = 35;
-const int ITEM_W   = 206;
+const int ITEM_H   = 34;
+const int ITEM_W   = 248;
 const int SPACING  = 5;
 const int VISIBLE_ITEMS = 5;
 
@@ -152,20 +158,22 @@ void setup() {
   pinMode(PIN_DOWN, INPUT_PULLUP);
   pinMode(PIN_OK,   INPUT_PULLUP);
 
-  tft.init();
-  tft.setRotation(0);
-  tft.fillScreen(TFT_BLACK);
-  tft.invertDisplay(true);
-
   // 1. Montar sistema de archivos LittleFS en la Flash del ESP32
   LittleFS.begin(true);
 
-  // 2. Cargar WiFi guardado en memoria NVS (Preferences.h)
+  // 2. Cargar WiFi y rotacion guardados en memoria NVS (Preferences.h)
   preferences.begin("g4briel_wifi", false);
   String savedSSID = preferences.getString("ssid", "");
   String savedPass = preferences.getString("pass", "");
-  currentLayout = (MenuLayout)preferences.getInt("layout", (int)currentLayout);
-  currentTheme  = (ThemeId)preferences.getInt("theme", (int)currentTheme);
+  currentLayout  = (MenuLayout)preferences.getInt("layout", (int)currentLayout);
+  currentTheme   = (ThemeId)preferences.getInt("theme", (int)currentTheme);
+  screenRotation = preferences.getInt("rot", 1);
+  if (screenRotation != 1 && screenRotation != 3) screenRotation = 1;
+
+  tft.init();
+  tft.setRotation(screenRotation); // 1 o 3 = MODO HORIZONTAL (280x240)
+  tft.fillScreen(TFT_BLACK);
+  tft.invertDisplay(true);
 
   if (savedSSID.length() > 0) {
     hasSavedWifi = true;
@@ -276,34 +284,35 @@ void dibujarBarraEstado(const char* titulo) {
 
   tft.setTextColor(th.accent, 0x10A2);
   tft.setTextSize(1);
-  tft.drawString(titulo, 8, 8);
+  tft.drawString(titulo, 10, 8);
 
-  dibujarIconoWifi(SCREEN_W - 50, 2, wifiConnected ? TFT_GREEN : th.accent);
+  dibujarIconoWifi(SCREEN_W - 52, 2, wifiConnected ? TFT_GREEN : th.accent);
 
-  tft.drawRect(SCREEN_W - 28, 7, 18, 9, TFT_LIGHTGREY);
-  tft.fillRect(SCREEN_W - 10, 9, 2, 5, TFT_LIGHTGREY);
-  tft.fillRect(SCREEN_W - 26, 9, 12, 5, TFT_GREEN);
+  tft.drawRect(SCREEN_W - 30, 7, 18, 9, TFT_LIGHTGREY);
+  tft.fillRect(SCREEN_W - 12, 9, 2, 5, TFT_LIGHTGREY);
+  tft.fillRect(SCREEN_W - 28, 9, 12, 5, TFT_GREEN);
 }
 
 void animacionInicio() {
   tft.fillScreen(TFT_BLACK);
   const ThemePalette& th = themes[currentTheme];
-  for (int r = 10; r <= 32; r += 5) {
-    tft.drawCircle(120, 85, r, th.accent);
+  int cx = SCREEN_W / 2; // 140
+  for (int r = 10; r <= 30; r += 5) {
+    tft.drawCircle(cx, 70, r, th.accent);
     delay(28);
   }
-  tft.fillRoundRect(106, 71, 28, 28, 6, th.accentBg);
-  tft.drawRoundRect(106, 71, 28, 28, 6, th.accent);
-  tft.fillRect(116, 81, 8, 8, th.accent);
+  tft.fillRoundRect(cx - 14, 56, 28, 28, 6, th.accentBg);
+  tft.drawRoundRect(cx - 14, 56, 28, 28, 6, th.accent);
+  tft.fillRect(cx - 4, 66, 8, 8, th.accent);
 
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
   tft.setTextSize(2);
-  tft.drawString("G4BRIEL OS", 56, 130);
+  tft.drawString("G4BRIEL OS", cx - 60, 114);
   tft.setTextColor(th.textSecondary, TFT_BLACK);
   tft.setTextSize(1);
-  tft.drawString("JS Engine - GitHub OTA", 44, 154);
+  tft.drawString("JS Engine - GitHub OTA (280x240)", cx - 92, 138);
 
-  const int barX = 30, barY = 195, barW = 180, barH = 8;
+  const int barX = 40, barY = 172, barW = 200, barH = 8;
   tft.drawRoundRect(barX, barY, barW, barH, 4, th.cardBorder);
 
   for (int p = 0; p <= 100; p += 5) {
@@ -354,11 +363,11 @@ void sincronizarDesdeGitHub() {
 
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
   tft.setTextSize(1);
-  tft.drawString("Repositorio GitHub:", 16, 40);
+  tft.drawString("Repositorio GitHub:", 16, 38);
   tft.setTextColor(th.accent, TFT_BLACK);
-  tft.drawString(GITHUB_REPO_URL, 16, 56);
+  tft.drawString(GITHUB_REPO_URL, 16, 54);
 
-  const int barX = 20, barY = 140, barW = 200, barH = 12;
+  const int barX = 24, barY = 130, barW = 232, barH = 12;
   tft.drawRoundRect(barX, barY, barW, barH, 4, th.cardBorder);
 
   descargarArchivoGitHub("manifest.json");
@@ -367,9 +376,9 @@ void sincronizarDesdeGitHub() {
   for (int i = 0; i < totalMainItems; i++) {
     String script = mainItems[i].scriptPath;
     if (!script.startsWith("system://")) {
-      tft.fillRect(20, 110, 200, 20, TFT_BLACK);
+      tft.fillRect(24, 102, 232, 20, TFT_BLACK);
       tft.setTextColor(TFT_WHITE, TFT_BLACK);
-      tft.drawString(("GET /" + script).c_str(), 20, 110);
+      tft.drawString(("GET /" + script).c_str(), 24, 102);
       descargarArchivoGitHub(script.c_str());
     }
     int fillW = map(i + 1, 0, totalMainItems, 30, barW - 4);
@@ -378,7 +387,7 @@ void sincronizarDesdeGitHub() {
   }
 
   tft.setTextColor(TFT_GREEN, TFT_BLACK);
-  tft.drawString("Scripts .js actualizados!", 40, 180);
+  tft.drawString("Scripts .js actualizados!", 56, 168);
   delay(900);
 
   currentState = STATE_MAIN_MENU;
@@ -397,14 +406,14 @@ void ejecutarScriptJS(String scriptPath) {
   File f = LittleFS.open("/" + scriptPath, FILE_READ);
   if (!f) {
     dibujarBarraEstado("APP JS");
-    tft.fillRoundRect(12, 40, 216, 120, 8, th.cardBg);
-    tft.drawRoundRect(12, 40, 216, 120, 8, th.cardBorder);
+    tft.fillRoundRect(16, 38, 248, 120, 8, th.cardBg);
+    tft.drawRoundRect(16, 38, 248, 120, 8, th.cardBorder);
     tft.setTextColor(th.accent, th.cardBg);
     tft.setTextSize(1);
-    tft.drawString(("Archivo: /" + scriptPath).c_str(), 22, 60);
+    tft.drawString(("Archivo: /" + scriptPath).c_str(), 28, 58);
     tft.setTextColor(TFT_WHITE, th.cardBg);
-    tft.drawString("Pulsa 'GitHub Sync' para", 22, 85);
-    tft.drawString("descargar este .js del repo", 22, 102);
+    tft.drawString("Conecta al WiFi y pulsa 'GitHub Sync'", 28, 84);
+    tft.drawString("para descargar este .js del repo", 28, 102);
     return;
   }
 
@@ -450,26 +459,28 @@ void dibujarGameBoyPokemon() {
   const char* moves[3]    = { "Impactrueno!",     "Hidrobomba!",     "Llamarada!" };
 
   dibujarBarraEstado(titles[activePokemonEdition]);
-  tft.drawRoundRect(10, 32, 220, 140, 6, col);
+  tft.drawRoundRect(12, 30, 256, 148, 6, col);
   tft.setTextColor(col, TFT_BLACK);
   tft.setTextSize(2);
-  tft.drawString(pokemons[activePokemonEdition], 22, 48);
+  tft.drawString(pokemons[activePokemonEdition], 24, 44);
 
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
   tft.setTextSize(1);
-  tft.drawString("HP: 100/100 [============]", 22, 76);
+  tft.drawString("HP: 100/100 [================]", 24, 72);
 
-  tft.fillRoundRect(18, 108, 204, 52, 4, 0x08A2);
-  tft.drawRoundRect(18, 108, 204, 52, 4, col);
+  tft.fillRoundRect(20, 100, 240, 64, 4, 0x08A2);
+  tft.drawRoundRect(20, 100, 240, 64, 4, col);
   tft.setTextColor(TFT_WHITE, 0x08A2);
-  tft.drawString("Batalla GameBoy Color:", 26, 118);
+  tft.drawString("Batalla GameBoy Color (280x240):", 30, 114);
   tft.setTextColor(col, 0x08A2);
-  tft.drawString(moves[activePokemonEdition], 26, 136);
+  tft.setTextSize(2);
+  tft.drawString(moves[activePokemonEdition], 30, 134);
 
-  tft.fillRoundRect(20, 215, 200, 36, 6, 0x18E3);
-  tft.drawRoundRect(20, 215, 200, 36, 6, col);
+  tft.fillRoundRect(30, 190, 220, 34, 6, 0x18E3);
+  tft.drawRoundRect(30, 190, 220, 34, 6, col);
   tft.setTextColor(TFT_WHITE, 0x18E3);
-  tft.drawString("OK / UP / DOWN: Volver", 44, 228);
+  tft.setTextSize(1);
+  tft.drawString("Pulsa OK / UP / DOWN para Volver", 44, 203);
 }
 
 void dibujarListaSlim() {
@@ -486,8 +497,8 @@ void dibujarListaSlim() {
   if (selectedIndex < scrollOffset) scrollOffset = selectedIndex;
   else if (selectedIndex >= scrollOffset + VISIBLE_ITEMS) scrollOffset = selectedIndex - VISIBLE_ITEMS + 1;
 
-  int startY = STATUS_H + 7;
-  int itemX = (SCREEN_W - ITEM_W) / 2 - 2;
+  int startY = STATUS_H + 6;
+  int itemX = (SCREEN_W - ITEM_W) / 2;
 
   for (int i = 0; i < VISIBLE_ITEMS; i++) {
     int itemIdx = scrollOffset + i;
@@ -520,7 +531,7 @@ void dibujarListaSlim() {
       tft.setTextColor(currentState == STATE_G4BRIEL_GAMEBOY ? itemAccent : TFT_LIGHTGREY, th.cardBg);
     }
     tft.setTextSize(2);
-    tft.drawString(label.c_str(), itemX + 24, y + (ITEM_H - 14) / 2);
+    tft.drawString(label.c_str(), itemX + 18, y + (ITEM_H - 14) / 2);
   }
 }
 
@@ -552,56 +563,56 @@ void dibujarFocusCard() {
   }
   dibujarBarraEstado(header);
 
-  int centerY = STATUS_H + 48;
-  tft.fillRoundRect(14, centerY, 212, 100, 10, th.accentBg);
-  tft.drawRoundRect(14, centerY, 212, 100, 10, accent);
+  int centerY = STATUS_H + 40;
+  tft.fillRoundRect(20, centerY, 240, 105, 10, th.accentBg);
+  tft.drawRoundRect(20, centerY, 240, 105, 10, accent);
 
   tft.setTextColor(accent, th.accentBg);
   tft.setTextSize(2);
-  tft.drawString(curTitle.c_str(), 28, centerY + 20);
+  tft.drawString(curTitle.c_str(), 36, centerY + 22);
 
   tft.setTextColor(th.textSecondary, th.accentBg);
   tft.setTextSize(1);
-  tft.drawString(curSub.c_str(), 28, centerY + 52);
+  tft.drawString(curSub.c_str(), 36, centerY + 56);
 }
 
 void dibujarTecladoWifi() {
   const ThemePalette& th = themes[currentTheme];
   tft.fillScreen(TFT_BLACK);
-  dibujarBarraEstado("TECLADO WIFI");
+  dibujarBarraEstado("TECLADO WIFI (280x240)");
 
-  tft.fillRoundRect(8, 28, 224, 54, 6, th.cardBg);
-  tft.drawRoundRect(8, 28, 224, 54, 6, th.cardBorder);
+  tft.fillRoundRect(10, 28, 260, 52, 6, th.cardBg);
+  tft.drawRoundRect(10, 28, 260, 52, 6, th.cardBorder);
   tft.setTextColor(th.accent, th.cardBg);
   tft.setTextSize(1);
-  tft.drawString(("Red: " + wifiTargetSSID + " (" + String(wifiPassword.length()) + ")").c_str(), 14, 32);
+  tft.drawString(("Red: " + wifiTargetSSID + " (" + String(wifiPassword.length()) + ")").c_str(), 16, 32);
 
   tft.setTextColor(TFT_WHITE, th.cardBg);
   String fullPass = wifiPassword + "_";
-  if (fullPass.length() <= 16) {
+  if (fullPass.length() <= 19) {
     tft.setTextSize(2);
-    tft.drawString(fullPass.c_str(), 14, 48);
+    tft.drawString(fullPass.c_str(), 16, 46);
   } else {
-    // Si la contrasena es muy larga, usar 2 lineas de tamano 1 (hasta 64 caracteres sin salirse de pantalla)
+    // Si la contrasena es muy larga, usar 2 lineas de tamano 1 (hasta 76 caracteres sin salirse de pantalla)
     tft.setTextSize(1);
     String vis = fullPass;
-    if (vis.length() > 62) vis = "<<" + vis.substring(vis.length() - 60);
-    String l1 = vis.substring(0, min((unsigned int)32, vis.length()));
-    tft.drawString(l1.c_str(), 14, 48);
-    if (vis.length() > 32) {
-      String l2 = vis.substring(32);
+    if (vis.length() > 74) vis = "<<" + vis.substring(vis.length() - 72);
+    String l1 = vis.substring(0, min((unsigned int)38, vis.length()));
+    tft.drawString(l1.c_str(), 16, 46);
+    if (vis.length() > 38) {
+      String l2 = vis.substring(38);
       tft.setTextColor(TFT_GREEN, th.cardBg);
-      tft.drawString(l2.c_str(), 14, 62);
+      tft.drawString(l2.c_str(), 16, 60);
     }
   }
 
-  int drumY = 90;
-  tft.fillRoundRect(8, drumY, 224, 85, 8, 0x08A2);
-  tft.drawRoundRect(8, drumY, 224, 85, 8, th.cardBorder);
+  int drumY = 86;
+  tft.fillRoundRect(10, drumY, 260, 82, 8, 0x08A2);
+  tft.drawRoundRect(10, drumY, 260, 82, 8, th.cardBorder);
 
-  int kx = 104, ky = drumY + 24;
-  tft.fillRoundRect(kx - 8, ky, 48, 34, 6, th.accentBg);
-  tft.drawRoundRect(kx - 8, ky, 48, 34, 6, th.accent);
+  int kx = 120, ky = drumY + 22;
+  tft.fillRoundRect(kx - 8, ky, 52, 36, 6, th.accentBg);
+  tft.drawRoundRect(kx - 8, ky, 52, 36, 6, th.accent);
   tft.setTextColor(TFT_WHITE, th.accentBg);
 
   if (keyboardIndex == TOTAL_KEYS) {
@@ -610,18 +621,18 @@ void dibujarTecladoWifi() {
   } else if (keyboardIndex == TOTAL_KEYS + 1) {
     tft.setTextColor(TFT_GREEN, th.accentBg);
     tft.setTextSize(2);
-    tft.drawString("OK!", kx, ky + 10);
+    tft.drawString("OK!", kx + 2, ky + 10);
   } else {
     char curChar[2] = { keyboardKeys[keyboardIndex], '\0' };
     tft.setTextSize(3);
-    tft.drawString(curChar, kx + 8, ky + 6);
+    tft.drawString(curChar, kx + 10, ky + 6);
   }
 
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
   tft.setTextSize(1);
-  tft.drawString("1 clic UP desde 'a' = [OK! Conectar]", 12, 195);
+  tft.drawString("1 clic UP desde 'a' = [OK! Conectar]", 24, 182);
   tft.setTextColor(TFT_GREEN, TFT_BLACK);
-  tft.drawString("O manten presionado OK (0.6s)", 24, 214);
+  tft.drawString("O manten presionado OK (0.6s)", 40, 200);
 }
 
 void escanearRedesWifi() {
@@ -629,12 +640,12 @@ void escanearRedesWifi() {
   dibujarBarraEstado("BUSCANDO WIFI...");
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
   tft.setTextSize(2);
-  tft.drawString("Escaneando...", 40, 110);
+  tft.drawString("Escaneando...", 60, 105);
 
   int n = WiFi.scanNetworks();
   totalScannedNets = 0;
   for (int i = 0; i < n && totalScannedNets < (MAX_WIFI_NETS - 1); i++) {
-    scannedSSIDs[totalScannedNets++] = WiFi.SSID(i).substring(0, 16);
+    scannedSSIDs[totalScannedNets++] = WiFi.SSID(i).substring(0, 18);
   }
   scannedSSIDs[totalScannedNets++] = "< Volver";
 
@@ -765,6 +776,11 @@ void ejecutarSeleccion() {
       preferences.putInt("theme", (int)currentTheme);
       dibujarPantalla();
     } else if (selectedIndex == 4) {
+      screenRotation = (screenRotation == 1) ? 3 : 1;
+      tft.setRotation(screenRotation);
+      preferences.putInt("rot", screenRotation);
+      dibujarPantalla();
+    } else if (selectedIndex == 5) {
       currentState = STATE_MAIN_MENU;
       selectedIndex = 0;
       scrollOffset = 0;
